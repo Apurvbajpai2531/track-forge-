@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}TrackForge{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <nav class="navbar">
+    <a href="{{ url_for('projects_list') }}" class="brand">⚡ TrackForge</a>
+    <div class="nav-links">
+      {% if session.get('token') %}
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">🌙</button>
+        <a href="{{ url_for('notifications_page') }}" class="notif-bell" id="notifBell" title="Notifications">
+          🔔<span class="notif-badge" id="notifBadge" style="display:none">0</span>
+        </a>
+        <a href="{{ url_for('profile_page') }}" class="nav-avatar" title="Profile">
+          {{ session.get('username', '?')[0].upper() }}
+        </a>
+        <a href="{{ url_for('logout') }}" style="color:var(--muted);padding:7px 12px;border-radius:6px;font-size:14px">Logout</a>
+      {% else %}
+        <a href="{{ url_for('login') }}">Login</a>
+        <a href="{{ url_for('register') }}">Sign up</a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <div id="toast-container"></div>
+  <script>
+    function showToast(message, type = 'info') {
+      const c = document.getElementById('toast-container');
+      const t = document.createElement('div');
+      t.className = `toast toast-${type}`;
+      t.textContent = message;
+      c.appendChild(t);
+      setTimeout(() => t.classList.add('toast-show'), 10);
+      setTimeout(() => { t.classList.remove('toast-show'); setTimeout(() => t.remove(), 300); }, 3500);
+    }
+
+    // Theme toggle
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = html.getAttribute('data-theme') === 'dark';
+      html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+      document.getElementById('themeBtn').textContent = isDark ? '☀️' : '🌙';
+      localStorage.setItem('tf-theme', isDark ? 'light' : 'dark');
+    }
+
+    // Restore saved theme
+    const savedTheme = localStorage.getItem('tf-theme');
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.textContent = savedTheme === 'light' ? '☀️' : '🌙';
+    }
+
+    // Notification badge polling
+    async function pollNotifications() {
+      try {
+        const res = await fetch('/api/notifications/unread-count');
+        if (!res.ok) return;
+        const data = await res.json();
+        const badge = document.getElementById('notifBadge');
+        if (badge) {
+          badge.textContent = data.count;
+          badge.style.display = data.count > 0 ? 'flex' : 'none';
+        }
+      } catch {}
+    }
+
+    {% if session.get('token') %}
+    pollNotifications();
+    setInterval(pollNotifications, 30000);
+    {% endif %}
+  </script>
+  <canvas id="confettiCanvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;display:none"></canvas>
+<script>
+function triggerConfetti() {
+  const canvas = document.getElementById('confettiCanvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  canvas.style.display = 'block';
+
+  const colors = ['#5b8def','#36b37e','#f2b94b','#e25563','#9b6bdb','#fff'];
+  const pieces = Array.from({length: 120}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * -canvas.height,
+    w: Math.random() * 10 + 5,
+    h: Math.random() * 6 + 3,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    rot: Math.random() * 360,
+    vx: (Math.random() - 0.5) * 4,
+    vy: Math.random() * 4 + 2,
+    vr: (Math.random() - 0.5) * 8,
+  }));
+
+  let frame = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rot += p.vr;
+      p.vy += 0.05;
+    });
+    frame++;
+    if (frame < 180) requestAnimationFrame(draw);
+    else canvas.style.display = 'none';
+  }
+  draw();
+}
+</script>
+</body>
+</html>

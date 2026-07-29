@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Login · TrackForge{% endblock %}
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <h1>Welcome back</h1>
+    <p class="auth-subtitle">Sign in to your TrackForge account</p>
+    <div class="form-group">
+      <label>Username</label>
+      <form method="POST">
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" name="username" required autofocus>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" name="password" required>
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%;justify-content:center;margin-top:8px">Sign in</button>
+      </form>
+    </div>
+    <p class="form-footer">No account? <a href="{{ url_for('register') }}">Sign up free</a></p>
+  </div>
+</div>
+{% endblock %}

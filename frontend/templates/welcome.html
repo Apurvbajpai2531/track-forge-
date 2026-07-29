@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Welcome · TrackForge{% endblock %}
+{% block content %}
+<div class="welcome-page" id="welcomePage">
+
+  <!-- Animated background particles -->
+  <div class="welcome-bg">
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+    <div class="particle"></div>
+  </div>
+
+  <div class="welcome-card" id="welcomeCard">
+    <div class="welcome-emoji" id="welcomeEmoji">🌅</div>
+    <div class="welcome-greeting" id="welcomeGreeting">Good Morning</div>
+    <div class="welcome-name" id="welcomeName">{{ user['full_name'] or user['username'] }}</div>
+    <div class="welcome-sub">Ready to crush it today? Your workspace is waiting.</div>
+
+    <div class="welcome-stats">
+      <div class="ws-item">
+        <span class="ws-value">{{ stats.get('total_issues', 0) }}</span>
+        <span class="ws-label">Total Issues</span>
+      </div>
+      <div class="ws-divider"></div>
+      <div class="ws-item">
+        <span class="ws-value" style="color:var(--yellow)">{{ stats.get('by_status', {}).get('in_progress', 0) }}</span>
+        <span class="ws-label">In Progress</span>
+      </div>
+      <div class="ws-divider"></div>
+      <div class="ws-item">
+        <span class="ws-value" style="color:var(--red)">{{ stats.get('overdue', 0) }}</span>
+        <span class="ws-label">Overdue</span>
+      </div>
+      <div class="ws-divider"></div>
+      <div class="ws-item">
+        <span class="ws-value" style="color:var(--green)">{{ stats.get('by_status', {}).get('done', 0) }}</span>
+        <span class="ws-label">Done</span>
+      </div>
+    </div>
+
+    <div class="welcome-progress-wrap">
+      <div class="welcome-timer-bar">
+        <div class="welcome-timer-fill" id="timerFill"></div>
+      </div>
+      <span class="welcome-timer-text" id="timerText">Redirecting in 5s…</span>
+    </div>
+
+    <div class="welcome-actions">
+      <a href="{{ url_for('projects_list') }}" class="btn-primary" style="min-width:160px;justify-content:center">
+        Go to Projects →
+      </a>
+      {% if project %}
+      <a href="{{ url_for('board', project_id=project['id']) }}" class="btn-secondary" style="min-width:160px;justify-content:center">
+        Open Last Board
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+// Time-based greeting
+const hour = new Date().getHours();
+let greeting, emoji, color;
+
+if (hour >= 5 && hour < 12) {
+  greeting = 'Good Morning';
+  emoji = '🌅';
+  color = '#f2b94b';
+} else if (hour >= 12 && hour < 17) {
+  greeting = 'Good Afternoon';
+  emoji = '☀️';
+  color = '#5b8def';
+} else if (hour >= 17 && hour < 21) {
+  greeting = 'Good Evening';
+  emoji = '🌆';
+  color = '#9b6bdb';
+} else {
+  greeting = 'Working Late?';
+  emoji = '🌙';
+  color = '#36b37e';
+}
+
+document.getElementById('welcomeGreeting').textContent = greeting;
+document.getElementById('welcomeGreeting').style.color = color;
+document.getElementById('welcomeEmoji').textContent = emoji;
+
+// Countdown and redirect
+let seconds = 5;
+const fill = document.getElementById('timerFill');
+const text = document.getElementById('timerText');
+const dest = "{{ url_for('projects_list') }}";
+
+fill.style.transition = `width ${seconds}s linear`;
+setTimeout(() => fill.style.width = '100%', 50);
+
+const interval = setInterval(() => {
+  seconds--;
+  text.textContent = seconds > 0 ? `Redirecting in ${seconds}s…` : 'Going now…';
+  if (seconds <= 0) {
+    clearInterval(interval);
+    document.getElementById('welcomeCard').style.animation = 'fadeOut .4s ease forwards';
+    setTimeout(() => window.location.href = dest, 400);
+  }
+}, 1000);
+</script>
+{% endblock %}

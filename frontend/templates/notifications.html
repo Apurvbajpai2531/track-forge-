@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Notifications · TrackForge{% endblock %}
+{% block content %}
+<div style="max-width:640px;margin:0 auto">
+  <div class="page-header">
+    <h1>Notifications</h1>
+    {% if notifications %}
+    <form method="POST" action="{{ url_for('notifications_mark_all') }}">
+      <button type="submit" class="btn-secondary">✓ Mark all read</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if notifications %}
+  <div style="display:flex;flex-direction:column;gap:8px">
+    {% for n in notifications %}
+    <div style="display:flex;align-items:flex-start;gap:12px;padding:14px 16px;
+      background:var(--surface);border:1px solid {% if not n['is_read'] %}var(--accent){% else %}var(--border){% endif %};
+      border-radius:10px;transition:border-color .15s">
+      <div style="width:10px;height:10px;border-radius:50%;margin-top:4px;flex-shrink:0;
+        background:{% if not n['is_read'] %}var(--accent){% else %}var(--border){% endif %}"></div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:{% if not n['is_read'] %}600{% else %}400{% endif %};margin-bottom:2px">
+          {{ n['title'] }}
+        </div>
+        {% if n['body'] %}<div style="font-size:13px;color:var(--muted)">{{ n['body'] }}</div>{% endif %}
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">{{ n['created_at'][:16].replace('T',' ') }}</div>
+      </div>
+      {% if n['link'] %}
+      <a href="{{ n['link'] }}" class="btn-secondary" style="padding:5px 10px;font-size:12px">View →</a>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div style="font-size:48px;margin-bottom:12px">🔔</div>
+    <h3>All caught up!</h3>
+    <p>No notifications yet. Activity on your projects will appear here.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

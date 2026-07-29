@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Projects · TrackForge{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="projects-header">
+    <h1>Projects</h1>
+    <p>Select a project to view its board</p>
+  </div>
+  <a href="{{ url_for('project_new') }}" class="btn-primary">+ New Project</a>
+</div>
+
+{% if projects %}
+<div class="projects-grid">
+  {% for p in projects %}
+  <a class="project-card" href="{{ url_for('board', project_id=p['id']) }}">
+    <div class="project-card-header">
+      <span class="project-key-pill">{{ p['key'] }}</span>
+      <span class="project-arrow">→</span>
+    </div>
+    <div class="project-name">{{ p['name'] }}</div>
+    <div class="project-desc">{{ p['description'] or 'No description provided.' }}</div>
+    <div class="project-card-footer">
+      <span class="project-stat">📅 {{ p['created_at'][:10] }}</span>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div style="font-size:48px;margin-bottom:12px">📋</div>
+  <h3>No projects yet</h3>
+  <p>Create your first project to start tracking issues</p>
+  <a href="{{ url_for('project_new') }}" class="btn-primary">+ Create project</a>
+</div>
+{% endif %}
+{% endblock %}

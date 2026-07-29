@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Roadmap · {{ project['name'] }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Roadmap</h1>
+  <div class="header-actions">
+    <a href="{{ url_for('board', project_id=project['id']) }}" class="btn-secondary">← Board</a>
+  </div>
+</div>
+
+{% if issues %}
+<div class="detail-card" style="overflow-x:auto">
+  <div id="roadmap" style="min-width:700px;padding:8px 0"></div>
+</div>
+<script>
+const issues = {{ issues | tojson }};
+const now = new Date();
+
+const allDates = issues.filter(i => i.due_date || i.created_at).map(i => new Date(i.due_date || i.created_at));
+const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
+const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+const totalDays = Math.max((maxDate - minDate) / 86400000, 30) + 14;
+
+const colors = { low:'#36b37e', medium:'#5b8def', high:'#f2b94b', critical:'#e25563' };
+const statusText = { todo:'To Do', in_progress:'In Progress', in_review:'In Review', done:'Done' };
+
+const container = document.getElementById('roadmap');
+
+issues.forEach((issue, i) => {
+  const start = new Date(issue.created_at);
+  const end = issue.due_date ? new Date(issue.due_date) : new Date(start.getTime() + 7*86400000);
+  const leftPct = Math.max(0, (start - minDate) / (totalDays * 86400000) * 100);
+  const widthPct = Math.max(2, (end - start) / (totalDays * 86400000) * 100);
+  const isOverdue = issue.due_date && new Date(issue.due_date) < now && issue.status !== 'done';
+
+  const row = document.createElement('div');
+  row.style.cssText = `position:relative;height:44px;display:flex;align-items:center;border-bottom:1px solid var(--border);padding:0 8px`;
+
+  const label = document.createElement('div');
+  label.style.cssText = `width:180px;flex-shrink:0;font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:12px`;
+  label.title = issue.title;
+  label.textContent = `${issue.key}: ${issue.title}`;
+
+  const track = document.createElement('div');
+  track.style.cssText = `flex:1;position:relative;height:100%`;
+
+  const bar = document.createElement('div');
+  bar.style.cssText = `
+    position:absolute; top:50%; transform:translateY(-50%);
+    height:24px; border-radius:6px;
+    left:${leftPct}%; width:${widthPct}%;
+    background:${colors[issue.priority]};
+    opacity:${issue.status==='done'?0.4:0.8};
+    display:flex; align-items:center; justify-content:center;
+    font-size:11px; color:#fff; font-weight:600; cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 8px;
+    transition:opacity .15s, transform .15s;
+    ${isOverdue ? 'box-shadow:0 0 0 2px #e25563' : ''}
+  `;
+  bar.textContent = statusText[issue.status] || issue.status;
+  bar.title = `${issue.key}: ${issue.title}\nStatus: ${issue.status}\nPriority: ${issue.priority}`;
+  bar.onmouseover = () => bar.style.opacity = '1';
+  bar.onmouseout = () => bar.style.opacity = issue.status === 'done' ? '0.4' : '0.8';
+  bar.onclick = () => window.location.href = `/projects/{{ project['id'] }}/issues/${issue.id}`;
+
+  track.appendChild(bar);
+  row.appendChild(label);
+  row.appendChild(track);
+  container.appendChild(row);
+});
+
+// Today marker
+const todayPct = (now - minDate) / (totalDays * 86400000) * 100;
+if (todayPct >= 0 && todayPct <= 100) {
+  const rows = container.querySelectorAll('div[style*="border-bottom"]');
+  rows.forEach(row => {
+    const track = row.querySelector('div[style*="flex:1"]');
+    if (!track) return;
+    const marker = document.createElement('div');
+    marker.style.cssText = `position:absolute;top:0;bottom:0;left:${todayPct}%;width:1px;background:var(--red);opacity:0.6;z-index:10`;
+    const label = document.createElement('span');
+    label.style.cssText = `position:absolute;top:2px;left:2px;font-size:9px;color:var(--red);white-space:nowrap`;
+    label.textContent = 'today';
+    marker.appendChild(label);
+    track.appendChild(marker);
+  });
+}
+</script>
+{% else %}
+<div class="empty-state">
+  <div style="font-size:48px;margin-bottom:12px">🗺️</div>
+  <h3>No issues with dates</h3>
+  <p>Add due dates to your issues to see them on the roadmap</p>
+  <a href="{{ url_for('issue_new', project_id=project['id']) }}" class="btn-primary">+ New Issue</a>
+</div>
+{% endif %}
+{% endblock %}

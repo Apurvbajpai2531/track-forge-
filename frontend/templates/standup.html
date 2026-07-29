@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Standup · TrackForge{% endblock %}
+{% block content %}
+<div style="max-width:640px;margin:0 auto">
+  <a href="{{ url_for('board', project_id=project_id) }}" class="back-link">← Back to board</a>
+
+  <div class="form-card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <span style="font-size:32px">📢</span>
+      <div>
+        <h1 style="font-size:20px;margin-bottom:2px">Daily Standup Generator</h1>
+        <p style="color:var(--muted);font-size:13px">AI generates your standup from project activity</p>
+      </div>
+    </div>
+
+    <button class="btn-primary" style="width:100%;justify-content:center;margin-bottom:20px" onclick="generateStandup()" id="genBtn">
+      🤖 Generate My Standup
+    </button>
+
+    <div id="standupResult" style="display:none">
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:20px;white-space:pre-line;font-size:15px;line-height:1.8;color:var(--text-2)" id="standupText"></div>
+
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="copyStandup()">📋 Copy</button>
+        <button class="btn-secondary" onclick="generateStandup()">↺ Regenerate</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function generateStandup() {
+  const btn = document.getElementById('genBtn');
+  btn.textContent = '⏳ Generating…';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`/api/projects/{{ project_id }}/standup/generate`, { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('standupText').textContent = data.standup;
+      document.getElementById('standupResult').style.display = 'block';
+      showToast('Standup generated!', 'success');
+    } else {
+      showToast('Failed: ' + data.error, 'error');
+    }
+  } catch { showToast('Error generating standup', 'error'); }
+  finally { btn.textContent = '🤖 Generate My Standup'; btn.disabled = false; }
+}
+
+function copyStandup() {
+  navigator.clipboard.writeText(document.getElementById('standupText').textContent);
+  showToast('Copied to clipboard!', 'success');
+}
+</script>
+{% endblock %}

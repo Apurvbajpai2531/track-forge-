@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}AI Issue Assistant · TrackForge{% endblock %}
+{% block content %}
+<div style="max-width:680px;margin:0 auto">
+  <a href="{{ url_for('board', project_id=project_id) }}" class="back-link">← Back to board</a>
+
+  <div class="form-card">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+      <span style="font-size:32px">🤖</span>
+      <div>
+        <h1 style="font-size:20px;margin-bottom:2px">AI Issue Assistant</h1>
+        <p style="color:var(--muted);font-size:13px">Describe your problem in plain English — AI will create a proper issue</p>
+      </div>
+    </div>
+
+    <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:16px;margin:20px 0">
+      <div style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Try saying something like…</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <span class="chip" onclick="setPrompt(this)" style="cursor:pointer">The login button crashes on mobile Safari</span>
+        <span class="chip" onclick="setPrompt(this)" style="cursor:pointer">Users can't reset their password via email</span>
+        <span class="chip" onclick="setPrompt(this)" style="cursor:pointer">Add dark mode toggle to settings page</span>
+        <span class="chip" onclick="setPrompt(this)" style="cursor:pointer">API response time is very slow when filtering</span>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Describe the issue in plain language</label>
+      <textarea id="aiPrompt" rows="4" placeholder="e.g. When I try to upload a profile picture larger than 2MB, the page just refreshes and nothing happens. No error message is shown. This happens on Chrome and Firefox."
+        style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:8px;font-size:15px;resize:vertical"></textarea>
+    </div>
+
+    <button class="btn-primary" style="width:100%;justify-content:center;font-size:15px" onclick="generateIssue()" id="genBtn">
+      ✨ Generate Issue with AI
+    </button>
+
+    <div id="aiResult" style="display:none;margin-top:24px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+        <span style="font-size:16px">✅</span>
+        <span style="font-size:14px;font-weight:600;color:var(--green)">Issue generated — review and create</span>
+        <button onclick="generateIssue()" class="btn-link" style="margin-left:auto;font-size:12px">↺ Regenerate</button>
+      </div>
+
+      <form method="POST" action="{{ url_for('issue_new', project_id=project_id) }}">
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" name="title" id="genTitle" required style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:11px 14px;border-radius:6px;font-size:15px;width:100%">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="description" id="genDesc" rows="6" style="width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:12px;border-radius:6px;font-size:14px;resize:vertical"></textarea>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Type</label>
+            <select name="type" id="genType" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:11px;border-radius:6px;font-size:14px;width:100%">
+              <option value="bug">🐛 Bug</option>
+              <option value="task">✅ Task</option>
+              <option value="story">📖 Story</option>
+              <option value="epic">⚡ Epic</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Priority</label>
+            <select name="priority" id="genPriority" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:11px;border-radius:6px;font-size:14px;width:100%">
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%;justify-content:center;margin-top:4px">
+          🚀 Create This Issue
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function setPrompt(el) {
+  document.getElementById('aiPrompt').value = el.textContent;
+}
+
+async function generateIssue() {
+  const prompt = document.getElementById('aiPrompt').value.trim();
+  if (!prompt) { showToast('Please describe the issue first', 'error'); return; }
+
+  const btn = document.getElementById('genBtn');
+  btn.textContent = '⏳ Thinking…';
+  btn.disabled = true;
+
+  try {
+    const response = await fetch('/ai/generate-issue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await response.json();
+    if (!data.ok) { showToast(data.error || 'AI failed', 'error'); return; }
+
+    document.getElementById('genTitle').value = data.title;
+    document.getElementById('genDesc').value = data.description;
+    document.getElementById('genType').value = data.type;
+    document.getElementById('genPriority').value = data.priority;
+    document.getElementById('aiResult').style.display = 'block';
+    document.getElementById('aiResult').scrollIntoView({ behavior: 'smooth' });
+    showToast('Issue generated!', 'success');
+  } catch (e) {
+    showToast('Something went wrong', 'error');
+  } finally {
+    btn.textContent = '✨ Generate Issue with AI';
+    btn.disabled = false;
+  }
+}
+</script>
+{% endblock %}

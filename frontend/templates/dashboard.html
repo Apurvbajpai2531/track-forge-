@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · TrackForge{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ project['name'] if project else '' }} — Dashboard</h1>
+  <a href="{{ url_for('board', project_id=project_id) }}" class="btn-secondary">← Board</a>
+</div>
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon">📋</div>
+    <div class="stat-value">{{ stats.get('total_issues', 0) }}</div>
+    <div class="stat-label">Total Issues</div>
+  </div>
+  <div class="stat-card stat-done">
+    <div class="stat-icon">✅</div>
+    <div class="stat-value">{{ stats.get('by_status', {}).get('done', 0) }}</div>
+    <div class="stat-label">Done</div>
+  </div>
+  <div class="stat-card stat-progress">
+    <div class="stat-icon">🔄</div>
+    <div class="stat-value">{{ stats.get('by_status', {}).get('in_progress', 0) }}</div>
+    <div class="stat-label">In Progress</div>
+  </div>
+  <div class="stat-card stat-overdue">
+    <div class="stat-icon">⏰</div>
+    <div class="stat-value">{{ stats.get('overdue', 0) }}</div>
+    <div class="stat-label">Overdue</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📝</div>
+    <div class="stat-value">{{ stats.get('by_status', {}).get('todo', 0) }}</div>
+    <div class="stat-label">To Do</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">👁️</div>
+    <div class="stat-value">{{ stats.get('by_status', {}).get('in_review', 0) }}</div>
+    <div class="stat-label">In Review</div>
+  </div>
+</div>
+
+<div class="charts-grid">
+  <div class="chart-card">
+    <h3>Issues by Status</h3>
+    <div class="chart-container">
+      <canvas id="statusChart"></canvas>
+    </div>
+  </div>
+  <div class="chart-card">
+    <h3>Issues by Priority</h3>
+    <div class="chart-container">
+      <canvas id="priorityChart"></canvas>
+    </div>
+  </div>
+</div>
+
+{% if stats.get('total_issues', 0) > 0 %}
+{% set done = stats.get('by_status', {}).get('done', 0) %}
+{% set total = stats.get('total_issues', 1) %}
+<div class="detail-card">
+  <div class="detail-section-label">Overall Progress</div>
+  <div style="display:flex;align-items:center;gap:16px;margin-top:8px">
+    <div class="board-progress" style="flex:1;margin:0">
+      <div class="board-progress-bar" style="width:{{ (done / total * 100)|int }}%"></div>
+    </div>
+    <span style="font-size:22px;font-weight:800;color:var(--green);white-space:nowrap">{{ (done / total * 100)|int }}%</span>
+  </div>
+  <p style="color:var(--muted);font-size:13px;margin-top:8px">{{ done }} of {{ total }} issues completed</p>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.color = '#7b82a0';
+Chart.defaults.borderColor = '#2a3050';
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+const statusData = {{ stats.get('by_status', {}) | tojson }};
+const priorityData = {{ stats.get('by_priority', {}) | tojson }};
+
+new Chart(document.getElementById('statusChart'), {
+  type: 'bar',
+  data: {
+    labels: Object.keys(statusData).map(s => s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())),
+    datasets: [{
+      label: 'Issues',
+      data: Object.values(statusData),
+      backgroundColor: ['rgba(139,146,165,0.6)','rgba(91,141,239,0.6)','rgba(242,185,75,0.6)','rgba(54,179,126,0.6)'],
+      borderColor: ['#8b92a5','#5b8def','#f2b94b','#36b37e'],
+      borderWidth: 1, borderRadius: 6,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: '#2a3050' } }, x: { grid: { display: false } } }
+  }
+});
+
+new Chart(document.getElementById('priorityChart'), {
+  type: 'doughnut',
+  data: {
+    labels: Object.keys(priorityData).map(s => s.charAt(0).toUpperCase()+s.slice(1)),
+    datasets: [{
+      data: Object.values(priorityData),
+      backgroundColor: ['rgba(54,179,126,0.7)','rgba(91,141,239,0.7)','rgba(242,185,75,0.7)','rgba(226,85,99,0.7)'],
+      borderColor: ['#36b37e','#5b8def','#f2b94b','#e25563'],
+      borderWidth: 1,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom', labels: { padding: 16, boxWidth: 12 } } },
+    cutout: '65%',
+  }
+});
+</script>
+{% endblock %}

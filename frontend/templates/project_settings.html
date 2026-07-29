@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Settings · {{ project['name'] }}{% endblock %}
+{% block content %}
+<div style="max-width:640px;margin:0 auto">
+  <a href="{{ url_for('board', project_id=project['id']) }}" class="back-link">← Back to board</a>
+
+  <!-- Members -->
+  <div class="form-card" style="margin-bottom:16px">
+    <h2 style="font-size:16px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">👥 Project Members</h2>
+    {% if members %}
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+      {% for m in members %}
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px">
+        <div class="avatar" style="width:34px;height:34px;font-size:13px">{{ m['username'][0].upper() }}</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600">{{ m['full_name'] or m['username'] }}</div>
+          <div style="font-size:12px;color:var(--muted)">@{{ m['username'] }} · {{ m['email'] }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <h3 style="font-size:14px;margin-bottom:12px;color:var(--muted)">Add member by user ID</h3>
+    <form method="POST" action="{{ url_for('project_add_member', project_id=project['id']) }}" style="display:flex;gap:10px">
+      <input type="number" name="user_id" placeholder="User ID" required style="flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:6px;font-size:14px">
+      <select name="role" style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:10px;border-radius:6px;font-size:14px">
+        <option value="member">Member</option>
+        <option value="admin">Admin</option>
+      </select>
+      <button type="submit" class="btn-primary">Add</button>
+    </form>
+  </div>
+
+  <!-- Templates -->
+  <div class="form-card" style="margin-bottom:16px">
+    <h2 style="font-size:16px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">📋 Issue Templates</h2>
+    {% if templates %}
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+      {% for t in templates %}
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px">
+        <span class="badge badge-{{ t['type'] }}">{{ t['type'] }}</span>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600">{{ t['name'] }}</div>
+          {% if t['default_title'] %}<div style="font-size:12px;color:var(--muted)">{{ t['default_title'] }}</div>{% endif %}
+        </div>
+        <span class="badge badge-priority-{{ t['priority'] }}">{{ t['priority'] }}</span>
+        <form method="POST" action="{{ url_for('delete_template', project_id=project['id'], template_id=t['id']) }}">
+          <button type="submit" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px" title="Delete">🗑</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <h3 style="font-size:14px;margin-bottom:12px;color:var(--muted)">Create new template</h3>
+    <form method="POST" action="{{ url_for('create_template', project_id=project['id']) }}">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Template name</label>
+          <input type="text" name="name" required placeholder="e.g. Bug Report">
+        </div>
+        <div class="form-group">
+          <label>Default title</label>
+          <input type="text" name="default_title" placeholder="e.g. [BUG] ">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type</label>
+          <select name="type">
+            <option value="task">Task</option>
+            <option value="bug">Bug</option>
+            <option value="story">Story</option>
+            <option value="epic">Epic</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select name="priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description template</label>
+        <textarea name="description" rows="3" placeholder="## Steps to reproduce&#10;1. &#10;## Expected&#10;## Actual"></textarea>
+      </div>
+      <button type="submit" class="btn-primary">Create Template</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

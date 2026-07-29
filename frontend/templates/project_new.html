@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}New Project · TrackForge{% endblock %}
+{% block content %}
+<div style="max-width:560px;margin:0 auto">
+  <a href="{{ url_for('projects_list') }}" class="back-link">← Back to projects</a>
+  <div class="form-card">
+    <h1>New Project</h1>
+    <p class="form-subtitle">Set up a new project workspace</p>
+    <form method="POST">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Project key</label>
+          <input type="text" name="key" maxlength="10" required placeholder="e.g. TF, PROJ">
+        </div>
+        <div class="form-group">
+          <label>Project name</label>
+          <input type="text" name="name" required placeholder="My awesome project">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Description <span style="color:var(--muted)">(optional)</span></label>
+        <textarea name="description" rows="3" placeholder="What is this project about?"></textarea>
+      </div>
+      <button type="submit" class="btn-primary" style="width:100%;justify-content:center">Create project</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}New Issue · TrackForge{% endblock %}
+{% block content %}
+<div style="max-width:600px;margin:0 auto">
+  <a href="{{ url_for('board', project_id=project_id) }}" class="back-link">← Back to board</a>
+
+  {% if templates %}
+  <div style="margin-bottom:16px">
+    <div style="font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Quick Templates</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      {% for t in templates %}
+      <button type="button" class="chip" onclick="applyTemplate({{ t | tojson }})">{{ t['name'] }}</button>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="form-card">
+    <h1>New Issue</h1>
+    <p class="form-subtitle">Add a new issue to this project</p>
+    <form method="POST" id="issueForm">
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" name="title" id="issueTitle" required autofocus placeholder="Describe the issue briefly">
+      </div>
+      <div class="form-group">
+        <label>
+          Description
+          <span class="muted" style="font-size:11px;margin-left:6px">Markdown supported</span>
+        </label>
+        <div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+          <div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface-2)">
+            <button type="button" id="writeTab" onclick="switchTab('write')"
+              style="padding:6px 14px;font-size:13px;border:none;cursor:pointer;background:var(--accent);color:white;font-weight:600">Write</button>
+            <button type="button" id="previewTab" onclick="switchTab('preview')"
+              style="padding:6px 14px;font-size:13px;border:none;cursor:pointer;background:transparent;color:var(--muted)">Preview</button>
+          </div>
+          <textarea name="description" id="issueDesc" rows="6"
+            style="width:100%;background:var(--surface-2);border:none;color:var(--text);padding:12px;font-size:14px;resize:vertical;font-family:inherit"
+            placeholder="## Steps to reproduce&#10;1. Go to...&#10;&#10;## Expected&#10;It should...&#10;&#10;## Actual&#10;Instead..."></textarea>
+          <div id="descPreview"
+            style="display:none;min-height:120px;padding:12px;font-size:14px;color:var(--text-2);line-height:1.7;background:var(--surface-2)"></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type</label>
+          <select name="type" id="issueType">
+            <option value="task">✅ Task</option>
+            <option value="bug">🐛 Bug</option>
+            <option value="story">📖 Story</option>
+            <option value="epic">⚡ Epic</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select name="priority" id="issuePriority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Due date <span class="muted">(optional)</span></label>
+        <input type="date" name="due_date">
+      </div>
+      <button type="submit" class="btn-primary" style="width:100%;justify-content:center">Create issue</button>
+    </form>
+  </div>
+</div>
+<div class="form-group">
+  <label>Story Points <span class="muted">(optional)</span></label>
+  <div style="display:flex;gap:8px;flex-wrap:wrap" id="spPicker">
+    {% for pts in [1, 2, 3, 5, 8, 13, 21] %}
+    <button type="button" class="sp-btn" onclick="selectSP({{ pts }})" data-pts="{{ pts }}"
+      style="width:44px;height:44px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:15px;font-weight:700;cursor:pointer;transition:all .15s">
+      {{ pts }}
+    </button>
+    {% endfor %}
+  </div>
+  <input type="hidden" name="story_points" id="spValue">
+</div>
+
+<style>
+.sp-btn.selected { background:var(--purple) !important; border-color:var(--purple) !important; color:#fff !important; transform:scale(1.1); }
+</style>
+<script>
+function selectSP(pts) {
+  document.querySelectorAll('.sp-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector(`.sp-btn[data-pts="${pts}"]`).classList.add('selected');
+  document.getElementById('spValue').value = pts;
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+<script>
+function applyTemplate(t) {
+  document.getElementById('issueTitle').value = t.default_title || '';
+  document.getElementById('issueDesc').value = t.description || '';
+  document.getElementById('issueType').value = t.type;
+  document.getElementById('issuePriority').value = t.priority;
+  document.getElementById('issueTitle').focus();
+}
+
+function switchTab(tab) {
+  const textarea = document.getElementById('issueDesc');
+  const preview = document.getElementById('descPreview');
+  const writeBtn = document.getElementById('writeTab');
+  const previewBtn = document.getElementById('previewTab');
+  if (tab === 'preview') {
+    preview.innerHTML = marked.parse(textarea.value || '*Nothing to preview*');
+    preview.style.display = 'block';
+    textarea.style.display = 'none';
+    writeBtn.style.background = 'transparent';
+    writeBtn.style.color = 'var(--muted)';
+    previewBtn.style.background = 'var(--accent)';
+    previewBtn.style.color = 'white';
+  } else {
+    preview.style.display = 'none';
+    textarea.style.display = 'block';
+    writeBtn.style.background = 'var(--accent)';
+    writeBtn.style.color = 'white';
+    previewBtn.style.background = 'transparent';
+    previewBtn.style.color = 'var(--muted)';
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+{% block title %}{{ project['key'] if project else '' }} Board · TrackForge{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <h1>{{ project['name'] }} <span class="muted" style="font-weight:400;font-size:16px">({{ project['key'] }})</span></h1>
+  </div>
+  <div class="header-actions">
+    <a href="{{ url_for('project_dashboard', project_id=project['id']) }}" class="btn-secondary">📊 Dashboard</a>
+    <a href="{{ url_for('export_issues', project_id=project['id']) }}" class="btn-secondary">⬇️ Export CSV</a>
+    <a href="{{ url_for('issue_new', project_id=project['id']) }}" class="btn-primary">+ New Issue</a>
+    <a href="{{ url_for('sprint_list', project_id=project['id']) }}" class="btn-secondary">🏃 Sprints</a>
+    <a href="{{ url_for('roadmap', project_id=project['id']) }}" class="btn-secondary">🗺️ Roadmap</a>
+    <a href="{{ url_for('project_settings', project_id=project['id']) }}" class="btn-secondary">⚙️ Settings</a>
+    <a href="{{ url_for('ai_create', project_id=project['id']) }}" class="btn-secondary">🤖 AI Create</a>
+  </div>
+</div>
+
+<div class="board-controls">
+  <form method="GET" class="search-bar">
+    <svg class="search-icon" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M15 15l-3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <input type="text" name="search" value="{{ search }}" placeholder="Search issues...">
+    {% if search %}<a class="search-clear" href="{{ url_for('board', project_id=project['id']) }}">✕</a>{% endif %}
+  </form>
+  <div class="filter-chips">
+    <a href="{{ url_for('board', project_id=project['id'], search=search, filter='all') }}"
+       class="chip {% if filter_type == 'all' %}chip-active{% endif %}">All</a>
+    <a href="{{ url_for('board', project_id=project['id'], search=search, filter='mine') }}"
+       class="chip {% if filter_type == 'mine' %}chip-active{% endif %}">My Issues</a>
+    <a href="{{ url_for('board', project_id=project['id'], search=search, filter='overdue') }}"
+       class="chip chip-danger {% if filter_type == 'overdue' %}chip-active{% endif %}">⏰ Overdue</a>
+    <a href="{{ url_for('standup', project_id=project['id']) }}" class="btn-secondary">📢 Standup</a>
+      </div>
+</div>
+
+<p class="kbd-hint"><kbd>c</kbd> quick create · <kbd>n</kbd> new · <kbd>/</kbd> search · <kbd>d</kbd> dashboard · <kbd>s</kbd> sprints · <kbd>r</kbd> roadmap · right-click card to bulk select</p>
+
+{% set done_count = columns.get('done', [])|length %}
+{% if total > 0 %}
+<div class="board-progress">
+  <div class="board-progress-bar" style="width: {{ (done_count / total * 100)|int }}%"></div>
+  <span class="board-progress-label">{{ (done_count / total * 100)|int }}% complete · {{ done_count }}/{{ total }} done</span>
+</div>
+{% endif %}
+
+<div class="board" id="board">
+  {% for status, label, wip_limit, color in [
+    ('todo','To Do', None, '#8b92a5'),
+    ('in_progress','In Progress', 5, '#5b8def'),
+    ('in_review','In Review', 3, '#f2b94b'),
+    ('done','Done', None, '#36b37e')
+  ] %}
+  {% set col_issues = columns.get(status, []) %}
+  {% set over_wip = wip_limit and col_issues|length > wip_limit %}
+  <div class="board-column" data-status="{{ status }}">
+    <div class="column-header" onclick="toggleColumn(this)">
+      <div class="column-title">
+        <span class="column-dot" style="background:{{ color }}"></span>
+        <span>{{ label }}</span>
+      </div>
+      <div class="column-header-right">
+        <span class="count {% if over_wip %}count-over{% endif %}">
+          {{ col_issues|length }}{% if wip_limit %}<span class="wip-limit">/{{ wip_limit }}</span>{% endif %}
+        </span>
+        <svg class="col-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 8l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+    {% if over_wip %}<div class="wip-warning">⚠️ WIP limit exceeded</div>{% endif %}
+    <div class="column-drop-zone" data-status="{{ status }}">
+      {% for issue in col_issues %}
+        {% set is_overdue = issue['due_date'] and issue['status'] != 'done' %}
+        <div class="issue-card priority-{{ issue['priority'] }}"
+             draggable="true"
+             data-issue-id="{{ issue['id'] }}"
+             onclick="openSidebar({{ project['id'] }}, {{ issue['id'] }}, '{{ url_for('issue_detail', project_id=project['id'], issue_id=issue['id']) }}')">
+          <div class="card-top">
+            <span class="issue-key">{{ issue['key'] }}</span>
+            <span class="issue-type-icon" title="{{ issue['type'] }}">{% if issue['type'] == 'bug' %}🐛{% elif issue['type'] == 'story' %}📖{% elif issue['type'] == 'epic' %}⚡{% else %}✅{% endif %}</span>
+          </div>
+          <div class="issue-title">{{ issue['title'] }}</div>
+          <div class="card-bottom">
+            <script>  
+
+              // Aging heatmap
+function applyAging() {
+  const now = Date.now();
+  document.querySelectorAll('.issue-card').forEach(card => {
+    const created = card.dataset.created;
+    if (!created) return;
+    const days = (now - new Date(created).getTime()) / 86400000;
+    let cls = 'age-fresh', txt = '', txtCls = '';
+    if (days > 30)      { cls = 'age-stale'; txt = `${Math.floor(days)}d old`; txtCls = 'age-stale-text'; }
+    else if (days > 14) { cls = 'age-old';   txt = `${Math.floor(days)}d old`; txtCls = 'age-old-text'; }
+    else if (days > 7)  { cls = 'age-week';  txt = `${Math.floor(days)}d`; }
+    card.classList.add(cls);
+    if (txt) {
+      const badge = document.createElement('span');
+      badge.className = `age-badge ${txtCls}`;
+      badge.textContent = txt;
+      card.querySelector('.card-bottom')?.appendChild(badge);
+    }
+  });
+}
+applyAging();
+            </script>
+            <div>
+              <div class="issue-card priority-{{ issue['priority'] }}"
+     draggable="true"
+     data-issue-id="{{ issue['id'] }}"
+     data-created="{{ issue['created_at'] }}"
+     ...>
+            </div>
+            <span class="priority-dot priority-dot-{{ issue['priority'] }}" title="{{ issue['priority'] }}"></span>
+            {% if issue['due_date'] %}
+              <span class="issue-due {% if is_overdue %}overdue{% endif %}">📅 {{ issue['due_date'][:10] }}</span>
+            {% endif %}
+            {% if issue['assignee_id'] %}
+              <span class="avatar" title="Assignee #{{ issue['assignee_id'] }}">{{ issue['assignee_id'] }}</span>
+            {% endif %}
+            {% if issue['story_points'] %}
+<span style="background:var(--purple);color:white;font-size:10px;font-weight:800;padding:1px 7px;border-radius:99px;margin-left:auto">{{ issue['story_points'] }}sp</span>
+{% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Sidebar overlay + panel -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+<aside class="issue-sidebar" id="issueSidebar">
+  <div class="sidebar-header">
+    <span class="sidebar-key" id="sidebarKey">—</span>
+    <div class="sidebar-header-actions">
+      <a class="btn-link" id="sidebarFullLink" href="#">↗ Full page</a>
+      <button class="sidebar-close-btn" onclick="closeSidebar()">✕</button>
+    </div>
+  </div>
+  <div class="sidebar-body" id="sidebarBody">
+    <div class="sidebar-loading">Loading…</div>
+  </div>
+</aside>
+
+<script>
+const projectId = {{ project['id'] }};
+let draggedCard = null;
+
+// ---- Drag & drop ----
+document.querySelectorAll('.issue-card').forEach(card => {
+  card.addEventListener('dragstart', e => { draggedCard = card; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+  card.addEventListener('dragend', () => { card.classList.remove('dragging'); draggedCard = null; });
+});
+
+document.querySelectorAll('.column-drop-zone').forEach(zone => {
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drop-hover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drop-hover'));
+  zone.addEventListener('drop', async e => {
+    e.preventDefault(); zone.classList.remove('drop-hover');
+    if (!draggedCard) return;
+    const issueId = draggedCard.dataset.issueId;
+    const newStatus = zone.dataset.status;
+    const oldParent = draggedCard.parentElement;
+    zone.appendChild(draggedCard);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/issues/${issueId}/move`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({status: newStatus})
+      });
+      const data = await res.json();
+      if (!data.ok) { oldParent.appendChild(draggedCard); showToast('Could not move: ' + (data.error || 'error'), 'error'); }
+      else { showToast('Moved ✓', 'success'); setTimeout(() => location.reload(), 700); }
+    } catch { oldParent.appendChild(draggedCard); showToast('Network error', 'error'); }
+  });
+});
+
+// ---- Column collapse ----
+function toggleColumn(header) { header.closest('.board-column').classList.toggle('collapsed'); }
+
+// ---- Sidebar ----
+const escHtml = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+async function openSidebar(pid, issueId, fullUrl) {
+  const sidebar = document.getElementById('issueSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  document.getElementById('sidebarKey').textContent = '…';
+  document.getElementById('sidebarFullLink').href = fullUrl;
+  document.getElementById('sidebarBody').innerHTML = '<div class="sidebar-loading">Loading…</div>';
+  sidebar.classList.add('open');
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const res = await fetch(`/projects/${pid}/issues/${issueId}/json`);
+    const {issue, comments} = await res.json();
+    if (!issue) { document.getElementById('sidebarBody').innerHTML = '<p>Failed to load.</p>'; return; }
+    document.getElementById('sidebarKey').textContent = issue.key;
+    const pColors = {low:'var(--green)',medium:'var(--accent)',high:'var(--yellow)',critical:'var(--red)'};
+
+    document.getElementById('sidebarBody').innerHTML = `
+      <h2 class="sidebar-title">${escHtml(issue.title)}</h2>
+      <div class="sidebar-meta-grid">
+        <div class="meta-row">
+          <span class="meta-label">Status</span>
+          <select class="meta-select" onchange="sidebarMove(${issue.id}, this.value)">
+            ${['todo','in_progress','in_review','done'].map(s =>
+              `<option value="${s}" ${issue.status===s?'selected':''}>${s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}</option>`
+            ).join('')}
+          </select>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Priority</span>
+          <span class="meta-value priority-pill" style="color:${pColors[issue.priority]||'#fff'}">● ${issue.priority}</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Type</span>
+          <span class="meta-value">${issue.type}</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Reporter</span>
+          <span class="meta-value">User #${issue.reporter_id}</span>
+        </div>
+        ${issue.assignee_id ? `<div class="meta-row"><span class="meta-label">Assignee</span><span class="meta-value">User #${issue.assignee_id}</span></div>` : ''}
+        ${issue.due_date ? `<div class="meta-row"><span class="meta-label">Due</span><span class="meta-value ${new Date(issue.due_date)<new Date()&&issue.status!=='done'?'text-red':''}">${issue.due_date.slice(0,10)}</span></div>` : ''}
+        <div class="meta-row"><span class="meta-label">Created</span><span class="meta-value">${issue.created_at.slice(0,10)}</span></div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Description</div>
+        <div class="sidebar-desc">${issue.description ? escHtml(issue.description) : '<span style="color:var(--muted)">No description provided.</span>'}</div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-label">Comments (${comments.length})</div>
+        <div class="sidebar-comments" id="sidebarComments">
+          ${comments.length === 0 ? '<p style="color:var(--muted);font-size:13px;padding:8px 0">No comments yet. Be the first!</p>' :
+            comments.map(c => `
+              <div class="sidebar-comment">
+                <div class="comment-avatar">${c.author_id}</div>
+                <div style="flex:1">
+                  <div class="comment-meta">User #${c.author_id} · ${c.created_at.slice(0,10)}</div>
+                  <div class="comment-text">${escHtml(c.body)}</div>
+                </div>
+              </div>
+            `).join('')}
+        </div>
+        <div class="sidebar-comment-form">
+          <textarea id="sidebarCommentBox" placeholder="Write a comment…" rows="3"></textarea>
+          <button class="btn-primary" style="align-self:flex-end" onclick="sidebarComment(${pid}, ${issue.id})">Add comment</button>
+        </div>
+      </div>
+    `;
+  } catch { document.getElementById('sidebarBody').innerHTML = '<p>Failed to load issue.</p>'; }
+}
+
+function closeSidebar() {
+  document.getElementById('issueSidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+async function sidebarMove(issueId, newStatus) {
+  const res = await fetch(`/api/projects/${projectId}/issues/${issueId}/move`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({status: newStatus})
+  });
+  const data = await res.json();
+  if (data.ok) { showToast('Status updated ✓', 'success'); setTimeout(() => location.reload(), 800); }
+  else showToast('Failed to update', 'error');
+}
+
+async function sidebarComment(pid, issueId) {
+  const box = document.getElementById('sidebarCommentBox');
+  const body = box.value.trim();
+  if (!body) return;
+  box.disabled = true;
+  try {
+    const res = await fetch(`/projects/${pid}/issues/${issueId}/comment-ajax`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({body})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      box.value = '';
+      const c = data.comment;
+      const el = document.getElementById('sidebarComments');
+      const ph = el.querySelector('p');
+      if (ph) ph.remove();
+      const div = document.createElement('div');
+      div.className = 'sidebar-comment';
+      div.innerHTML = `<div class="comment-avatar">${c.author_id}</div><div style="flex:1"><div class="comment-meta">User #${c.author_id} · ${c.created_at.slice(0,10)}</div><div class="comment-text">${escHtml(c.body)}</div></div>`;
+      el.appendChild(div);
+      showToast('Comment added ✓', 'success');
+    } else showToast('Failed to add comment', 'error');
+  } finally { box.disabled = false; }
+}
+
+// ---- Keyboard shortcuts ----
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+  if (e.key === 'Escape') { closeSidebar(); return; }
+  if (e.key === 'n') window.location.href = "{{ url_for('issue_new', project_id=project['id']) }}";
+  if (e.key === '/') { e.preventDefault(); document.querySelector('.search-bar input')?.focus(); }
+  if (e.key === 'd') window.location.href = "{{ url_for('project_dashboard', project_id=project['id']) }}";
+});
+</script>
+{% endblock %}
+
+
+<!-- Bulk Action Bar (hidden until cards selected) -->
+<div id="bulkBar" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
+  padding:12px 20px;display:flex;align-items:center;gap:12px;box-shadow:var(--shadow-lg);z-index:200">
+  <span id="bulkCount" style="font-size:13px;color:var(--muted)">0 selected</span>
+  <select id="bulkStatusSel" style="background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px">
+    <option value="">Set status…</option>
+    <option value="todo">To Do</option>
+    <option value="in_progress">In Progress</option>
+    <option value="in_review">In Review</option>
+    <option value="done">Done</option>
+  </select>
+  <select id="bulkPrioritySel" style="background:var(--surface-3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px">
+    <option value="">Set priority…</option>
+    <option value="low">Low</option>
+    <option value="medium">Medium</option>
+    <option value="high">High</option>
+    <option value="critical">Critical</option>
+  </select>
+  <button class="btn-primary" onclick="applyBulk('set_status', document.getElementById('bulkStatusSel').value)" style="padding:6px 12px;font-size:13px">Apply</button>
+  <button onclick="clearSelection()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+</div>
+
+<!-- Quick-Create Modal (press C) -->
+<div id="quickCreateModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:600;align-items:flex-start;justify-content:center;padding-top:80px">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:100%;max-width:500px;box-shadow:var(--shadow-lg);animation:fadeUp .2s ease">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="font-size:18px">Quick Create Issue</h2>
+      <button onclick="closeQuickCreate()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('issue_new', project_id=project['id']) }}">
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" name="title" id="quickCreateTitle" required placeholder="What needs to be done?">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type</label>
+          <select name="type">
+            <option value="task">✅ Task</option>
+            <option value="bug">🐛 Bug</option>
+            <option value="story">📖 Story</option>
+            <option value="epic">⚡ Epic</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select name="priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="critical">Critical</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button type="submit" class="btn-primary" style="flex:1;justify-content:center">Create Issue</button>
+        <button type="button" class="btn-secondary" onclick="closeQuickCreate()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ---- Quick create ----
+function openQuickCreate() {
+  document.getElementById('quickCreateModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('quickCreateTitle').focus(), 100);
+}
+function closeQuickCreate() {
+  document.getElementById('quickCreateModal').style.display = 'none';
+}
+
+// ---- Bulk select ----
+let selectedIds = new Set();
+
+document.querySelectorAll('.issue-card').forEach(card => {
+  card.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const id = card.dataset.issueId;
+    if (selectedIds.has(id)) { selectedIds.delete(id); card.style.outline = ''; }
+    else { selectedIds.add(id); card.style.outline = '2px solid var(--accent)'; card.style.outlineOffset = '2px'; }
+    updateBulkBar();
+  });
+});
+
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  document.getElementById('bulkCount').textContent = `${selectedIds.size} selected`;
+  bar.style.display = selectedIds.size > 0 ? 'flex' : 'none';
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.issue-card').forEach(c => { c.style.outline = ''; });
+  document.getElementById('bulkBar').style.display = 'none';
+}
+
+async function applyBulk(action, value) {
+  if (!value || selectedIds.size === 0) { showToast('Select a value first', 'error'); return; }
+  const res = await fetch(`/api/projects/${projectId}/bulk`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ issue_ids: [...selectedIds].map(Number), action, value })
+  });
+  const data = await res.json();
+  if (data.ok) { showToast(data.detail || 'Done ✓', 'success'); setTimeout(() => location.reload(), 700); }
+  else showToast(data.error || 'Failed', 'error');
+}
+
+// ---- Keyboard shortcuts update (add C) ----
+// Replace existing keydown listener with this:
+document.addEventListener('keydown', e => {
+  if (['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)) return;
+
+  if (e.key === 'Escape') {
+    closeSidebar();
+    closeQuickCreate();
+    clearSelection();
+    return;
+  }
+  if (e.key === 'c' || e.key === 'C') {
+    openQuickCreate();
+    return;
+  }
+  if (e.key === 'n' || e.key === 'N') {
+    window.location.href = "{{ url_for('issue_new', project_id=project['id']) }}";
+    return;
+  }
+  if (e.key === '/') {
+    e.preventDefault();
+    document.querySelector('.search-bar input')?.focus();
+    return;
+  }
+  if (e.key === 'd' || e.key === 'D') {
+    window.location.href = "{{ url_for('project_dashboard', project_id=project['id']) }}";
+    return;
+  }
+  if (e.key === 's' || e.key === 'S') {
+    window.location.href = "{{ url_for('sprint_list', project_id=project['id']) }}";
+    return;
+  }
+  if (e.key === 'r' || e.key === 'R') {
+    window.location.href = "{{ url_for('roadmap', project_id=project['id']) }}";
+    return;
+  }
+});
+</script>

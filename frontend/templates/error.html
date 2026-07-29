@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }} · TrackForge{% endblock %}
+{% block content %}
+<div class="error-page">
+  <div class="error-code">{{ code }}</div>
+  <div class="error-msg">{{ message }}</div>
+  <a href="{{ url_for('index') }}" class="btn-primary" style="margin-top:20px">Go home</a>
+</div>
+{% endblock %}

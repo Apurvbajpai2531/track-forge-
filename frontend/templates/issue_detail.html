@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% block title %}{{ issue['key'] if issue else 'Issue' }} · TrackForge{% endblock %}
+{% block content %}
+
+{% if issue %}
+
+<a href="{{ url_for('board', project_id=project_id) }}" class="back-link">← Back to board</a>
+
+<div class="issue-detail-layout">
+  <!-- Main content -->
+  <div class="issue-detail-main">
+
+    <div class="detail-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span class="project-key-pill">{{ issue['key'] }}</span>
+        <span class="badge badge-{{ issue['type'] }}">{{ issue['type'] }}</span>
+        <span class="badge badge-priority-{{ issue['priority'] }}">{{ issue['priority'] }}</span>
+      </div>
+
+      <h1 class="detail-title">{{ issue['title'] }}</h1>
+
+      <div class="detail-section-label" style="margin-top:16px">
+        Description
+      </div>
+
+     <div class="detail-desc md-body" id="descBody"></div>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+  <script>
+  document.getElementById('descBody').innerHTML = marked.parse({{ (issue['description'] or '') | tojson }});
+  </script>
+
+    <div class="detail-card">
+      <div class="detail-section-label">
+        Comments ({{ comments|length }})
+      </div>
+
+      {% if comments %}
+      <div class="comments-list" style="margin-top:12px">
+        {% for c in comments %}
+        <div class="comment-item">
+          <div class="comment-avatar">{{ c['author_id'] }}</div>
+
+          <div class="comment-bubble" style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <span class="comment-author">User #{{ c['author_id'] }}</span>
+              <span class="comment-date">{{ c['created_at'][:10] }}</span>
+            </div>
+
+            <div class="comment-body-text">
+              <div class="reaction-bar" data-comment-id="{{ c['id'] }}">
+  <div class="reaction-emojis">
+    {% for emoji in ['👍','❤️','😂','🎉','🔥','👀','😢','🚀'] %}
+    <button class="reaction-btn" onclick="toggleReaction({{ c['id'] }}, '{{ emoji }}')" title="{{ emoji }}">{{ emoji }}</button>
+    {% endfor %}
+  </div>
+  <div class="reaction-counts" id="reactions-{{ c['id'] }}"></div>
+</div>
+              {{ c['body'] }}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% else %}
+      <p style="color:var(--muted);font-size:14px;margin:12px 0">
+        No comments yet. Start the conversation.
+      </p>
+      {% endif %}
+
+      <div class="comment-form" style="margin-top:12px">
+        <form method="POST"
+              action="{{ url_for('add_comment', project_id=project_id, issue_id=issue['id']) }}">
+          <textarea
+              name="body"
+              placeholder="Add a comment…"
+              required></textarea>
+
+          <button type="submit" class="btn-primary">
+            Add comment
+          </button>
+        </form>
+      </div>
+    </div>
+
+
+
+    <!-- Pomodoro Timer -->
+<div class="detail-card" id="pomodoroCard">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+    <div class="detail-section-label">🍅 Focus Timer</div>
+    <div style="font-size:12px;color:var(--muted)" id="pomodoroStatus">Ready</div>
+  </div>
+
+  <div style="text-align:center;padding:16px 0">
+    <div id="pomodoroDisplay" style="font-size:56px;font-weight:900;font-family:monospace;color:var(--text);letter-spacing:-2px;line-height:1;margin-bottom:16px">25:00</div>
+
+    <div class="board-progress" style="margin-bottom:20px">
+      <div class="board-progress-bar" id="pomodoroBar" style="width:0%;background:linear-gradient(90deg,var(--red),var(--yellow))"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button class="btn-primary" id="pomodoroStartBtn" onclick="pomodoroStart()">▶ Start Focus</button>
+      <button class="btn-secondary" id="pomodoroPauseBtn" onclick="pomodoroPause()" style="display:none">⏸ Pause</button>
+      <button class="btn-secondary" onclick="pomodoroReset()">↺ Reset</button>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin-top:12px">Time auto-logs when timer completes ✓</p>
+  </div>
+</div>
+
+<script>
+let pomodoroTotal = 25 * 60;
+let pomodoroRemaining = pomodoroTotal;
+let pomodoroInterval = null;
+let pomodoroRunning = false;
+
+function pomodoroUpdate() {
+  const m = String(Math.floor(pomodoroRemaining / 60)).padStart(2,'0');
+  const s = String(pomodoroRemaining % 60).padStart(2,'0');
+  document.getElementById('pomodoroDisplay').textContent = `${m}:${s}`;
+
+  const pct = ((pomodoroTotal - pomodoroRemaining) / pomodoroTotal) * 100;
+  document.getElementById('pomodoroBar').style.width = pct + '%';
+
+  const color = pct > 80 ? 'var(--red)' : pct > 50 ? 'var(--yellow)' : 'var(--accent)';
+  document.getElementById('pomodoroDisplay').style.color = color;
+}
+
+function pomodoroStart() {
+  if (pomodoroRunning) return;
+  pomodoroRunning = true;
+  document.getElementById('pomodoroStartBtn').style.display = 'none';
+  document.getElementById('pomodoroPauseBtn').style.display = 'inline-flex';
+  document.getElementById('pomodoroStatus').textContent = '🔴 Focusing…';
+
+  pomodoroInterval = setInterval(() => {
+    pomodoroRemaining--;
+    pomodoroUpdate();
+    if (pomodoroRemaining <= 0) {
+      clearInterval(pomodoroInterval);
+      pomodoroRunning = false;
+      pomodoroComplete();
+    }
+  }, 1000);
+}
+
+function pomodoroPause() {
+  clearInterval(pomodoroInterval);
+  pomodoroRunning = false;
+  document.getElementById('pomodoroStartBtn').style.display = 'inline-flex';
+  document.getElementById('pomodoroStartBtn').textContent = '▶ Resume';
+  document.getElementById('pomodoroPauseBtn').style.display = 'none';
+  document.getElementById('pomodoroStatus').textContent = '⏸ Paused';
+}
+
+function pomodoroReset() {
+  clearInterval(pomodoroInterval);
+  pomodoroRunning = false;
+  pomodoroRemaining = pomodoroTotal;
+  pomodoroUpdate();
+  document.getElementById('pomodoroStartBtn').style.display = 'inline-flex';
+  document.getElementById('pomodoroStartBtn').textContent = '▶ Start Focus';
+  document.getElementById('pomodoroPauseBtn').style.display = 'none';
+  document.getElementById('pomodoroStatus').textContent = 'Ready';
+}
+
+async function pomodoroComplete() {
+  document.getElementById('pomodoroStatus').textContent = '✅ Session done!';
+  document.getElementById('pomodoroStartBtn').style.display = 'inline-flex';
+  document.getElementById('pomodoroStartBtn').textContent = '▶ Start Again';
+  document.getElementById('pomodoroPauseBtn').style.display = 'none';
+
+  // Auto-log 25 minutes
+  await fetch(`/projects/{{ project_id }}/issues/{{ issue['id'] }}/log-time`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'minutes=25&note=Pomodoro+focus+session'
+  });
+
+  showToast('🍅 25 mins logged automatically!', 'success');
+  triggerConfetti();
+
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('🍅 Pomodoro Done!', { body: 'Time for a 5-minute break.' });
+  } else if ('Notification' in window) {
+    Notification.requestPermission();
+  }
+}
+</script>
+
+    <!-- Time Tracking -->
+    <div class="detail-card">
+      <div class="detail-section-label" style="margin-bottom:12px">
+        ⏱️ Time Tracking
+
+        {% if total_time.get('total_minutes', 0) > 0 %}
+        <span style="float:right;font-size:14px;color:var(--accent);font-weight:700">
+          {{ total_time.get('total_hours', 0) }}h total
+        </span>
+        {% endif %}
+      </div>
+
+      <form method="POST"
+            action="{{ url_for('log_time', project_id=project_id, issue_id=issue['id']) }}"
+            style="display:flex;gap:10px;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap">
+
+        <div class="form-group" style="margin:0;flex:0 0 100px">
+          <label>Minutes</label>
+          <input type="number"
+                 name="minutes"
+                 min="1"
+                 max="480"
+                 placeholder="30"
+                 style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;width:100%;font-size:14px">
+        </div>
+
+        <div class="form-group" style="margin:0;flex:1;min-width:150px">
+          <label>Note</label>
+          <input type="text"
+                 name="note"
+                 placeholder="What did you work on?"
+                 style="background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;width:100%;font-size:14px">
+        </div>
+
+        <button type="submit" class="btn-primary" style="padding:8px 14px">
+          Log
+        </button>
+      </form>
+
+      {% if timelogs %}
+      <div style="display:flex;flex-direction:column;gap:6px">
+        {% for log in timelogs %}
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px">
+
+          <span style="font-size:14px;font-weight:700;color:var(--accent);min-width:50px">
+            {{ log['minutes'] }}m
+          </span>
+
+          <span style="font-size:13px;color:var(--text-2);flex:1">
+            {{ log['note'] or 'No note' }}
+          </span>
+
+          <span style="font-size:11px;color:var(--muted)">
+            {{ log['logged_at'][:10] }}
+          </span>
+
+        </div>
+        {% endfor %}
+      </div>
+
+      {% else %}
+      <p style="color:var(--muted);font-size:13px">
+        No time logged yet.
+      </p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Sidebar -->
+  <div class="issue-detail-sidebar">
+
+    <div class="detail-card">
+      <div class="detail-section-label" style="margin-bottom:16px">
+        Details
+      </div>
+
+      <form method="POST">
+        <div class="form-group">
+          <label>Status</label>
+
+         <select name="status" class="meta-status-select" onchange="if(this.value==='done'){triggerConfetti();showToast('🎉 Issue completed!','success')} this.form.submit()">
+
+            {% for s in ['todo','in_progress','in_review','done'] %}
+            <option value="{{ s }}"
+              {% if issue['status']==s %}selected{% endif %}>
+              {{ s.replace('_',' ').title() }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+      </form>
+
+      <table class="meta-table" style="margin-top:8px">
+        <tr>
+          <td>Priority</td>
+          <td class="badge-priority-{{ issue['priority'] }}" style="font-weight:600">
+            {{ issue['priority'].title() }}
+          </td>
+        </tr>
+
+        <tr>
+          <td>Type</td>
+          <td>{{ issue['type'].title() }}</td>
+        </tr>
+
+        <tr>
+          <td>Reporter</td>
+          <td>User #{{ issue['reporter_id'] }}</td>
+        </tr>
+
+        <tr>
+          <td>Assignee</td>
+          <td>
+            {% if issue['assignee_id'] %}
+              User #{{ issue['assignee_id'] }}
+            {% else %}
+              <span style="color:var(--muted)">Unassigned</span>
+            {% endif %}
+          </td>
+        </tr>
+
+        {% if issue['due_date'] %}
+        <tr>
+          <td>Due</td>
+          <td style="{% if issue['due_date'] < now %}color:var(--red);font-weight:600{% endif %}">
+            {{ issue['due_date'][:10] }}
+          </td>
+        </tr>
+        {% endif %}
+
+        <tr>
+          <td>Created</td>
+          <td>{{ issue['created_at'][:10] }}</td>
+        </tr>
+
+        <tr>
+          <td>Updated</td>
+          <td>{{ issue['updated_at'][:10] }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Checklist -->
+<div class="detail-card">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div class="detail-section-label">☑️ Checklist</div>
+    <span id="checklistSummary" style="font-size:12px;color:var(--muted)"></span>
+  </div>
+  <div class="checklist-progress">
+    <div class="checklist-progress-bar"><div class="checklist-progress-fill" id="checklistBar" style="width:0%"></div></div>
+    <span id="checklistPct">0%</span>
+  </div>
+  <div id="checklistItems"></div>
+  <div style="display:flex;gap:8px;margin-top:12px">
+    <input type="text" id="checklistInput" placeholder="Add checklist item…"
+      style="flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:14px"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();addChecklistItem()}">
+    <button class="btn-primary" onclick="addChecklistItem()" style="padding:8px 14px">Add</button>
+  </div>
+</div>
+
+<script>
+const issueId = {{ issue['id'] }};
+
+async function loadChecklist() {
+  const res = await fetch(`/api/issues/${issueId}/checklist`);
+  const items = await res.json();
+  renderChecklist(items);
+}
+
+function renderChecklist(items) {
+  const container = document.getElementById('checklistItems');
+  const done = items.filter(i => i.is_done).length;
+  const pct = items.length ? Math.round(done/items.length*100) : 0;
+  document.getElementById('checklistBar').style.width = pct + '%';
+  document.getElementById('checklistPct').textContent = pct + '%';
+  document.getElementById('checklistSummary').textContent = `${done}/${items.length}`;
+
+  container.innerHTML = items.map(item => `
+    <div class="checklist-item" onclick="toggleChecklist(${item.id})">
+      <div class="checklist-cb ${item.is_done ? 'checked' : ''}">${item.is_done ? '✓' : ''}</div>
+      <span class="checklist-text ${item.is_done ? 'done' : ''}">${item.text}</span>
+      <button onclick="event.stopPropagation();deleteChecklistItem(${item.id})"
+        style="background:none;border:none;color:var(--muted);cursor:pointer;opacity:0;transition:opacity .15s"
+        onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0'">✕</button>
+    </div>
+  `).join('');
+}
+
+async function addChecklistItem() {
+  const input = document.getElementById('checklistInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  await fetch(`/api/issues/${issueId}/checklist`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({text, position: 0})
+  });
+  loadChecklist();
+}
+
+async function toggleChecklist(itemId) {
+  await fetch(`/api/issues/${issueId}/checklist/${itemId}/toggle`, { method: 'PATCH' });
+  loadChecklist();
+}
+
+async function deleteChecklistItem(itemId) {
+  await fetch(`/api/issues/${issueId}/checklist/${itemId}`, { method: 'DELETE' });
+  loadChecklist();
+}
+
+loadChecklist();
+</script>
+    {% if activity %}
+    <div class="detail-card">
+      <div class="detail-section-label" style="margin-bottom:12px">
+        Activity
+      </div>
+
+      {% for log in activity[:10] %}
+      <div class="activity-item">
+        <div class="activity-dot"></div>
+
+        <div>
+          <div class="activity-text">{{ log['action'] }}</div>
+          <div class="activity-time">{{ log['created_at'][:10] }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% else %}
+
+<div class="error-page">
+  <div class="error-code">404</div>
+  <div class="error-msg">Issue not found.</div>
+
+  <a href="{{ url_for('projects_list') }}"
+     class="btn-primary"
+     style="margin-top:16px">
+    Go home
+  </a>
+</div>
+
+{% endif %}
+
+{% endblock %}
+
+
+<script>
+async function toggleReaction(commentId, emoji) {
+  await fetch(`/api/comments/${commentId}/reactions/${encodeURIComponent(emoji)}`, { method: 'POST' });
+  loadReactions(commentId);
+}
+
+async function loadReactions(commentId) {
+  const res = await fetch(`/api/comments/${commentId}/reactions`);
+  const counts = await res.json();
+  const el = document.getElementById(`reactions-${commentId}`);
+  if (!el) return;
+  el.innerHTML = Object.entries(counts)
+    .filter(([,c]) => c > 0)
+    .map(([emoji, count]) => `<span class="reaction-pill" onclick="toggleReaction(${commentId},'${emoji}')">${emoji} ${count}</span>`)
+    .join('');
+}
+
+document.querySelectorAll('.reaction-bar').forEach(bar => {
+  loadReactions(bar.dataset.commentId);
+});
+</script>
