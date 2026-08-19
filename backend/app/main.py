@@ -34,6 +34,10 @@ app.include_router(sprints.router)
 app.include_router(timelogs.router)
 app.include_router(bulk.router)
 app.include_router(reactions.router)
+app.include_router(notifications.router)
+app.include_router(checklist.router)
+app.include_router(templates.router)
+app.include_router(profile.router)
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
