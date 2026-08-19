@@ -24,3 +24,5 @@ EXPOSE 8000
 CMD ["python", "app.py"]
 
 RUN echo "Stage 2 is succeed"
+
+#-------------------------------------------------
