@@ -1,0 +1,171 @@
+<!-- Floating AI Assistant Widget -->
+<div id="ai-widget">
+  <button id="ai-fab" title="AI Assistant">
+    <span id="ai-fab-icon">✦</span>
+    <span id="ai-fab-badge" class="hidden">0</span>
+  </button>
+
+  <div id="ai-panel" class="hidden">
+    <div id="ai-panel-header">
+      <span>AI Assistant</span>
+      <span id="ai-limit-text">-- left today</span>
+      <button id="ai-close" title="Close">&times;</button>
+    </div>
+    <div id="ai-log"></div>
+    <form id="ai-form">
+      <input type="text" id="ai-input" placeholder="Ask anything..." autocomplete="off" required>
+      <button type="submit">➤</button>
+    </form>
+  </div>
+</div>
+
+<style>
+  #ai-widget { position: fixed; bottom: 24px; right: 24px; z-index: 9999; font-family: inherit; }
+
+  #ai-fab {
+    width: 56px; height: 56px; border-radius: 50%; border: none;
+    background: linear-gradient(135deg, #6366f1, #2563eb);
+    color: #fff; font-size: 24px; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.4);
+    display: flex; align-items: center; justify-content: center;
+    position: relative; transition: transform 0.15s ease;
+  }
+  #ai-fab:hover { transform: scale(1.06); }
+
+  #ai-fab-badge {
+    position: absolute; top: -4px; right: -4px;
+    background: #ef4444; color: #fff; font-size: 11px; font-weight: 600;
+    border-radius: 10px; padding: 2px 6px; min-width: 18px; text-align: center;
+    line-height: 1.3;
+  }
+  #ai-fab-badge.hidden { display: none; }
+
+  #ai-panel {
+    position: absolute; bottom: 68px; right: 0;
+    width: 340px; max-width: 90vw; height: 460px;
+    background: #fff; border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.18);
+    display: flex; flex-direction: column; overflow: hidden;
+    border: 1px solid #e5e7eb;
+  }
+  #ai-panel.hidden { display: none; }
+
+  #ai-panel-header {
+    background: linear-gradient(135deg, #6366f1, #2563eb);
+    color: #fff; padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: 14px;
+  }
+  #ai-limit-text { margin-left: auto; font-weight: 400; font-size: 11px; opacity: 0.9; }
+  #ai-close {
+    background: none; border: none; color: #fff; font-size: 18px;
+    cursor: pointer; line-height: 1; padding: 0 2px;
+  }
+
+  #ai-log {
+    flex: 1; overflow-y: auto; padding: 12px;
+    background: #f9fafb; display: flex; flex-direction: column; gap: 8px;
+  }
+  .ai-msg { max-width: 85%; padding: 7px 10px; border-radius: 10px; font-size: 13px; line-height: 1.4; white-space: pre-wrap; }
+  .ai-msg.user { align-self: flex-end; background: #2563eb; color: #fff; }
+  .ai-msg.assistant { align-self: flex-start; background: #e5e7eb; color: #111; }
+  .ai-msg.thinking { align-self: flex-start; background: #e5e7eb; color: #888; font-style: italic; }
+
+  #ai-form { display: flex; border-top: 1px solid #e5e7eb; }
+  #ai-input { flex: 1; border: none; padding: 10px 12px; font-size: 13px; outline: none; }
+  #ai-form button {
+    border: none; background: #2563eb; color: #fff; width: 44px; cursor: pointer; font-size: 14px;
+  }
+  #ai-form button:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+
+<script>
+(function () {
+  const fab = document.getElementById("ai-fab");
+  const fabBadge = document.getElementById("ai-fab-badge");
+  const panel = document.getElementById("ai-panel");
+  const closeBtn = document.getElementById("ai-close");
+  const log = document.getElementById("ai-log");
+  const form = document.getElementById("ai-form");
+  const input = document.getElementById("ai-input");
+  const limitText = document.getElementById("ai-limit-text");
+
+  let history = [];
+
+  function addMsg(role, text) {
+    const el = document.createElement("div");
+    el.className = "ai-msg " + role;
+    el.textContent = text;
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    return el;
+  }
+
+  function setLimit(remaining, limit) {
+    limitText.textContent = remaining + "/" + limit + " left today";
+    if (remaining <= 3) {
+      fabBadge.textContent = remaining;
+      fabBadge.classList.remove("hidden");
+    } else {
+      fabBadge.classList.add("hidden");
+    }
+  }
+
+  async function refreshUsage() {
+    try {
+      const resp = await fetch("/ai/chat/usage");
+      const data = await resp.json();
+      setLimit(data.remaining, data.limit);
+    } catch (e) { /* silent */ }
+  }
+
+  fab.addEventListener("click", () => {
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) {
+      refreshUsage();
+      input.focus();
+    }
+  });
+  closeBtn.addEventListener("click", () => panel.classList.add("hidden"));
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const message = input.value.trim();
+    if (!message) return;
+
+    addMsg("user", message);
+    history.push({ role: "user", content: message });
+    input.value = "";
+    input.disabled = true;
+
+    const thinking = addMsg("thinking", "Thinking...");
+
+    try {
+      const resp = await fetch("/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, history })
+      });
+      const data = await resp.json();
+      thinking.remove();
+
+      if (data.ok) {
+        addMsg("assistant", data.reply);
+        history.push({ role: "assistant", content: data.reply });
+        setLimit(data.remaining, data.limit);
+      } else {
+        addMsg("assistant", data.error || "Something went wrong.");
+        if (typeof data.remaining === "number") setLimit(data.remaining, data.limit);
+      }
+    } catch (err) {
+      thinking.remove();
+      addMsg("assistant", "Network error — assistant unreachable.");
+    } finally {
+      input.disabled = false;
+      input.focus();
+    }
+  });
+
+  refreshUsage();
+})();
+</script>

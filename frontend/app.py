@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from datetime import datetime
 from functools import wraps
@@ -557,7 +558,30 @@ def issue_new_with_templates(project_id):
     templates = templates_resp.json() if templates_resp.status_code == 200 else []
     return render_template("issue_new.html", project_id=project_id, templates=templates)
 
-import json
+
+# ===== AI features (via local Ollama) =====
+
+def call_ollama(prompt, max_tokens=400, json_mode=False):
+    """Calls local Ollama instead of Anthropic. Raises on failure."""
+    import requests as req
+    payload = {
+        "model": "llama3.2",
+        "prompt": prompt,
+        "stream": False,
+        "options": {"num_predict": max_tokens}
+    }
+    if json_mode:
+        payload["format"] = "json"
+
+    resp = req.post(
+        "http://stockloom-ollama:11434/api/generate",
+        json=payload,
+        timeout=30
+    )
+    if resp.status_code != 200:
+        raise Exception(f"Ollama error: {resp.status_code} {resp.text}")
+    return resp.json()["response"].strip()
+
 
 @app.route("/projects/<int:project_id>/ai-create")
 @login_required
@@ -573,46 +597,29 @@ def ai_generate_issue():
         return jsonify({"ok": False, "error": "No prompt provided"}), 400
 
     try:
-        import requests as req
-        api_resp = req.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": os.getenv("ANTHROPIC_API_KEY", ""),
-                "anthropic-version": "2023-06-01",
-            },
-            json={
-                "model": "claude-sonnet-5",
-                "max_tokens": 600,
-                "messages": [{
-                    "role": "user",
-                    "content": f"""You are a project management assistant. Convert this plain English description into a structured issue.
+        full_prompt = f"""You are a project management assistant. Convert this plain English description into a structured issue.
 
 Description: {prompt}
 
-Respond with ONLY valid JSON (no markdown, no explanation):
+Respond with ONLY valid JSON (no markdown, no explanation, no extra text before or after). Use \\n for line breaks inside string values, never literal newlines:
 {{
   "title": "concise issue title under 60 chars",
   "description": "## Problem\\nDetailed description\\n\\n## Steps to Reproduce\\n1. \\n\\n## Expected\\n\\n## Actual\\n",
   "type": "bug or task or story or epic",
   "priority": "low or medium or high or critical"
 }}"""
-                }]
-            },
-            timeout=15
-        )
 
-        if api_resp.status_code != 200:
-            logger.error("Anthropic API error: %s %s", api_resp.status_code, api_resp.text)
-            return jsonify({"ok": False, "error": "AI service error"}), 500
+        content = call_ollama(full_prompt, max_tokens=600, json_mode=True)
 
-        content = api_resp.json()["content"][0]["text"].strip()
         # Strip markdown code fences if present
         if content.startswith("```"):
             content = content.split("```")[1]
             if content.startswith("json"):
                 content = content[4:]
-        data = json.loads(content.strip())
+
+        # strict=False allows literal control chars (raw newlines) inside strings —
+        # small models often break this rule even in json_mode
+        data = json.loads(content.strip(), strict=False)
 
         return jsonify({
             "ok": True,
@@ -625,8 +632,6 @@ Respond with ONLY valid JSON (no markdown, no explanation):
     except Exception as e:
         logger.error("AI generate error: %s", e)
         return jsonify({"ok": False, "error": "AI generation failed"}), 500
-    
-
 
 
 @app.route("/projects/<int:project_id>/standup")
@@ -655,20 +660,7 @@ def generate_standup(project_id):
     """
 
     try:
-        import requests as req
-        api_resp = req.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": os.getenv("ANTHROPIC_API_KEY", ""),
-                "anthropic-version": "2023-06-01",
-            },
-            json={
-                "model": "claude-sonnet-5",
-                "max_tokens": 400,
-                "messages": [{
-                    "role": "user",
-                    "content": f"""Generate a concise daily standup update based on this project data.
+        full_prompt = f"""Generate a concise daily standup update based on this project data.
 
 {context}
 
@@ -678,20 +670,78 @@ Format it as:
 🚧 Blockers: (any blockers or risks)
 
 Keep it brief, professional, under 100 words total."""
-                }]
-            },
-            timeout=15
-        )
-        if api_resp.status_code != 200:
-            logger.error("Anthropic API error: %s %s", api_resp.status_code, api_resp.text)
-            return jsonify({"ok": False, "error": "AI service error"}), 500
 
-        text = api_resp.json()["content"][0]["text"]
+        text = call_ollama(full_prompt, max_tokens=400)
         return jsonify({"ok": True, "standup": text})
     except Exception as e:
         logger.error("Standup generate error: %s", e)
         return jsonify({"ok": False, "error": str(e)}), 500
 
+
+CHAT_DAILY_LIMIT = int(os.getenv("CHAT_DAILY_LIMIT", "20"))
+
+
+def get_chat_usage():
+    today = datetime.utcnow().strftime("%Y-%m-%d")
+    usage = session.get("chat_usage", {})
+    if usage.get("date") != today:
+        usage = {"date": today, "count": 0}
+    return usage
+
+
+@app.route("/ai/chat/usage")
+@login_required
+def ai_chat_usage():
+    usage = get_chat_usage()
+    remaining = max(0, CHAT_DAILY_LIMIT - usage["count"])
+    return jsonify({"remaining": remaining, "limit": CHAT_DAILY_LIMIT})
+
+
+@app.route("/ai/chat", methods=["POST"])
+@login_required
+def ai_chat():
+    usage = get_chat_usage()
+    if usage["count"] >= CHAT_DAILY_LIMIT:
+        return jsonify({
+            "ok": False,
+            "error": "Daily message limit reached. Try again tomorrow.",
+            "remaining": 0,
+            "limit": CHAT_DAILY_LIMIT
+        }), 429
+
+    data = request.json or {}
+    message = data.get("message", "").strip()
+    history = data.get("history", [])  # list of {"role": "user"/"assistant", "content": "..."}
+
+    if not message:
+        return jsonify({"ok": False, "error": "No message provided"}), 400
+
+    try:
+        system_prefix = (
+            "You are a helpful assistant embedded inside TrackForge, a project "
+            "management tool. Answer clearly and concisely. If asked about "
+            "TrackForge itself, mention it has projects, a kanban board, sprints, "
+            "labels, comments, and a dashboard.\n\n"
+        )
+
+        convo = ""
+        for turn in history[-10:]:
+            role = "User" if turn.get("role") == "user" else "Assistant"
+            convo += f"{role}: {turn.get('content', '')}\n"
+        convo += f"User: {message}\nAssistant:"
+
+        full_prompt = system_prefix + convo
+        reply = call_ollama(full_prompt, max_tokens=500)
+
+        usage["count"] += 1
+        session["chat_usage"] = usage
+        remaining = max(0, CHAT_DAILY_LIMIT - usage["count"])
+
+        return jsonify({"ok": True, "reply": reply, "remaining": remaining, "limit": CHAT_DAILY_LIMIT})
+
+    except Exception as e:
+        logger.error("AI chat error: %s", e)
+        return jsonify({"ok": False, "error": "AI assistant unavailable"}), 500
 
 
 if __name__ == "__main__":

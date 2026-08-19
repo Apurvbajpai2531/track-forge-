@@ -129,5 +129,8 @@ function triggerConfetti() {
   draw();
 }
 </script>
+{% if session.get('token') %}
+{% include "_ai_widget.html" %}
+{% endif %}
 </body>
 </html>
