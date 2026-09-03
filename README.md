@@ -181,18 +181,18 @@ kind delete cluster --name trackforge
 ### Pods running
 `kubectl get pods -n trackforge` showing all pods healthy.
 
-![Get pods](K8s/Ss/Getpods.png)
+![Get pods](k8s/Ss/Getpods.png)
 
 ### Services
 `kubectl get svc -n trackforge` showing ClusterIP and NodePort services.
 
-![Get services](K8s/Ss/GetSvc.png)
+![Get services](k8s/Ss/GetSvc.png)
 
 ### Persistent Volume Claim
 `kubectl get pvc -n trackforge` showing the PVC bound to a dynamically
 provisioned volume.
 
-![Get PVC](K8s/Ss/GetPvc.png)
+![Get PVC](k8s/Ss/GetPvc.png)
 
 ### App accessible via NodePort
 TrackForge frontend loading at `http://localhost:30500`.
