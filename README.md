@@ -1,74 +1,200 @@
-# TrackForge — Docker & Nginx Setup
+# TrackForge — Kubernetes Setup
 
-This document covers the containerization work done for TrackForge so far:
-Dockerizing the backend/frontend, wiring them together with Docker Compose,
-and adding an Nginx reverse proxy in front of both services.
+This document covers moving TrackForge from Docker Compose to a local Kubernetes
+cluster using **kind** (Kubernetes in Docker) — namespace, Postgres, backend,
+frontend, storage, config, and secrets, all wired together and reachable via
+NodePort.
 
-## 1. Dockerfile (backend & frontend)
+## Architecture
 
-- Multi-stage `Dockerfile` for both `backend/` and `frontend/`:
-  - **Stage 1 (builder)** — installs Python dependencies with
-    `pip install --user --no-cache-dir -r requirements.txt`.
-  - **Stage 2 (runtime)** — uses a `python:3.12-slim` base, copies only the
-    installed packages from the builder stage, then copies the app code.
-- Backend runs via `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
-- Frontend runs via `python app.py`, listening on `0.0.0.0:5000`.
-- Images built locally and pushed to Docker Hub:
-  `apurv25/trackforge-backend` and `apurv25/trackforge-frontend`.
+```
+                        ┌─────────────────────────────┐
+                        │   kind cluster: trackforge   │
+                        │   namespace: trackforge      │
+                        │                              │
+  localhost:30500 ─────▶│  frontend-service (NodePort) │
+                        │        │                     │
+                        │        ▼                     │
+                        │  frontend-deployment (x2)     │
+                        │        │                     │
+                        │        ▼                     │
+                        │  backend-service (ClusterIP)  │
+                        │        │                     │
+                        │        ▼                     │
+                        │  backend-deployment (x2)      │
+                        │        │                     │
+                        │        ▼                     │
+                        │  db (ClusterIP) ──▶ db-deployment │
+                        │        │                     │
+                        │        ▼                     │
+                        │      db-pvc (500Mi)           │
+                        └─────────────────────────────┘
+```
 
-## 2. Docker Compose
+## Prerequisites
 
-- `docker-compose.yml` orchestrates three app-level services plus nginx, all on
-  a shared bridge network (`trackforge-net`):
-  - **db** — Postgres 16, with a healthcheck (`pg_isready`) so dependent
-    services wait until it's actually ready, not just started.
-  - **backend** — built from `backend/Dockerfile`, reads config from
-    `backend/.env`, connects to `db` via `DATABASE_URL`.
-  - **frontend** — built from `frontend/Dockerfile`, reads config from
-    `frontend/.env`, calls the backend via `API_BASE_URL`.
-- Backend and frontend don't publish ports directly to the host (`expose`
-  instead of `ports`) — all external traffic goes through nginx.
+- Docker installed and running
+- `kind` installed (`kind version` to check)
+- `kubectl` installed (`kubectl version --client` to check)
 
-## 3. Nginx reverse proxy
+## Files in this setup
 
-- Added an `nginx` service (`nginx:1.27-alpine`), the only container exposing
-  a port to the host (`80`), using a mounted `nginx.conf`.
-- Routing:
-  - `/api/` → backend (`backend:8000`)
-  - `/docs` → backend's FastAPI docs
-  - `/` → frontend (`frontend:5000`)
-- Fixed a port mismatch bug during setup: frontend's `app.run()` was listening
-  on `5000`, while nginx/compose were initially wired for `8000` — corrected
-  the upstream and `expose` port to `5000` to resolve a 502 Bad Gateway.
+| File | What it does |
+|---|---|
+| `kind-config.yaml` | Defines the cluster and maps host ports (80, 443, 30500) into it |
+| `k8s/namespace.yml` | Creates the `trackforge` namespace |
+| `k8s/persistentvolumeclaim.yml` | Requests 500Mi of storage for Postgres data |
+| `k8s/ConfigMap.yml` | Non-sensitive Postgres config (`POSTGRES_USER`, `POSTGRES_DB`) |
+| `k8s/secrets.yml` | Sensitive Postgres config (`POSTGRES_PASSWORD`) — **not committed**, see `secrets.yml.example` |
+| `k8s/postgres-deployment.yml` | Runs Postgres 16, mounts the PVC, has readiness/liveness probes |
+| `k8s/postgres_service.yml` | ClusterIP service named `db` — internal DNS name backend connects to |
+| `k8s/backend-deployment.yml` | Runs the FastAPI backend (2 replicas), connects to `db`, has probes |
+| `k8s/backend-service.yml` | ClusterIP service exposing the backend internally on port 8000 |
+| `k8s/frontend-deployment.yml` | Runs the Flask frontend (2 replicas), has probes |
+| `k8s/frontend-service.yml` | NodePort service — exposes the frontend on `localhost:30500` |
+
+## Step-by-step setup
+
+### 1. Create the kind cluster
+```bash
+cd ~/imp1/track-forge-
+kind create cluster --config kind-config.yaml
+kubectl cluster-info --context kind-trackforge
+kubectl get nodes
+```
+
+### 2. Create the namespace
+```bash
+cd k8s
+kubectl apply -f namespace.yml
+kubectl get namespaces
+```
+
+### 3. Set up storage
+```bash
+kubectl apply -f persistentvolumeclaim.yml
+kubectl get pvc -n trackforge
+```
+`STATUS` should show `Bound` — kind's default StorageClass (`standard`)
+provisions the volume automatically, no manual `PersistentVolume` needed.
+
+### 4. Add config and secrets
+```bash
+kubectl apply -f ConfigMap.yml
+
+# secrets.yml is gitignored — create your own from the example first:
+# cp secrets.yml.example secrets.yml   (then fill in a real password)
+kubectl apply -f secrets.yml
+```
+
+### 5. Deploy Postgres
+```bash
+kubectl apply -f postgres-deployment.yml
+kubectl apply -f postgres_service.yml
+kubectl get pods -n trackforge -w
+```
+Wait until the `db-deployment` pod shows `Running` before continuing —
+the backend depends on it.
+
+### 6. Deploy the backend
+```bash
+kubectl apply -f backend-deployment.yml
+kubectl apply -f backend-service.yml
+kubectl get pods -n trackforge -w
+```
+
+### 7. Deploy the frontend
+```bash
+kubectl apply -f frontend-deployment.yml
+kubectl apply -f frontend-service.yml
+kubectl get pods -n trackforge
+```
+
+### 8. Verify everything is up
+```bash
+kubectl get pods -n trackforge
+kubectl get svc -n trackforge
+kubectl get pvc -n trackforge
+```
+All pods should show `1/1 Running`, and `trackforge-service` should list
+`5000:30500/TCP` under `PORT(S)`.
+
+### 9. Access the app
+```
+http://localhost:30500
+```
+
+## Useful commands for debugging
+
+```bash
+# describe a pod to see events / errors
+kubectl describe pod <pod-name> -n trackforge
+
+# tail logs for a deployment's pods
+kubectl logs -l app=trackforge-backend -n trackforge --tail=50
+
+# restart all pods of a deployment (force a fresh retry)
+kubectl delete pod -l app=trackforge-backend -n trackforge
+
+# port-forward as an alternative to NodePort
+kubectl port-forward svc/trackforge-service -n trackforge 5000:5000
+
+# tear everything down
+kubectl delete namespace trackforge
+kind delete cluster --name trackforge
+```
+
+## Key concepts used
+
+- **Namespace** — isolates all TrackForge resources under `trackforge`.
+- **PersistentVolumeClaim** — requests storage for Postgres; kind's default
+  StorageClass provisions it dynamically (no manual `PersistentVolume` needed).
+- **ConfigMap vs Secret** — non-sensitive values (username, db name) go in a
+  ConfigMap and are safe to commit; sensitive values (password) go in a Secret
+  and are gitignored.
+- **Deployment** — manages pod replicas, restarts crashed pods, and enables
+  rolling updates. Pods are never created directly.
+- **Readiness / Liveness probes** — readiness controls whether a pod receives
+  traffic; liveness controls whether Kubernetes restarts it.
+- **ClusterIP vs NodePort** — ClusterIP (`db`, `backend-service`) is only
+  reachable inside the cluster; NodePort (`trackforge-service`) opens a port
+  on the host machine (`30500`) for external access.
+
+## Issues hit and fixed along the way
+
+- **Backend `CrashLoopBackOff`** — caused by the `db` service not existing
+  yet; resolved once the Postgres Deployment + Service were applied.
+- **`CreateContainerConfigError` on the db pod** — ConfigMap/Secret hadn't
+  been applied yet, or were referenced with mismatched names.
+- **PVC stuck `Pending`** — a manually written `PersistentVolume` used a
+  `hostPath` that didn't exist inside the kind node, and the PVC's
+  `storageClassName: manual` didn't match any real StorageClass. Fixed by
+  removing the manual PV and `storageClassName`, letting kind's default
+  dynamic provisioner handle it.
+- **NodePort not reachable** — kind doesn't map the 30000–32767 NodePort
+  range to the host by default; added an explicit `extraPortMappings` entry
+  for `30500` in `kind-config.yaml` (requires recreating the cluster to
+  take effect).
 
 ## Screenshots
 
-### Container list
-`docker compose ps` showing all containers running.
+### Pods running
+`kubectl get pods -n trackforge` showing all pods healthy.
 
-![Container list](Screenshots/containerlist.png)
+![Get pods](K8s/Ss/Getpods.png)
 
-### Docker logs
-Container logs showing services starting up cleanly.
+### Services
+`kubectl get svc -n trackforge` showing ClusterIP and NodePort services.
 
-![Docker logs](Screenshots/dockerlogs.png)
+![Get services](K8s/Ss/GetSvc.png)
 
-### Nginx serving the app
-App accessible through nginx on `http://localhost`.
+### Persistent Volume Claim
+`kubectl get pvc -n trackforge` showing the PVC bound to a dynamically
+provisioned volume.
 
-![Nginx host](Screenshots/Nginx-Host.png)
+![Get PVC](K8s/Ss/GetPvc.png)
 
-## How to run it
+### App accessible via NodePort
+TrackForge frontend loading at `http://localhost:30500`.
 
-```bash
-git clone <repo-url>
-cd track-forge-
-
-# create backend/.env and frontend/.env yourself (not committed — see .gitignore)
-# backend/.env needs: DATABASE_URL, SECRET_KEY
-# frontend/.env needs: API_BASE_URL, API_TIMEOUT_SECONDS, FRONTEND_SECRET_KEY
-
-docker compose up --build
-```
-
-Visit `http://localhost` once all containers are up.
+![NodePort login](k8s/Ss/NodePortLogin.png)
