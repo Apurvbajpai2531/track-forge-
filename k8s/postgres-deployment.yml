@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-deployment
+  namespace: trackforge
+  labels:
+    app: trackforge-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate    # avoid two Postgres pods writing to the same volume at once
+  selector:
+    matchLabels:
+      app: trackforge-db
+  template:
+    metadata:
+      labels:
+        app: trackforge-db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: db-config
+            - secretRef:
+                name: db-secret
+          volumeMounts:
+            - name: db-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres    # avoids "lost+found" issue on fresh volumes
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "trackforge", "-d", "trackforge"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "trackforge", "-d", "trackforge"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: db-pvc
