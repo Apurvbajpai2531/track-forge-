@@ -1,0 +1,49 @@
+name: DevSecOps Pipeline - TrackForge
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # ---------- Stage 1: Code quality gate ----------
+  code-quality:
+    uses: ./.github/workflows/code-quality.yml
+
+  # ---------- Stage 2: Tests (needs quality to pass first) ----------
+  tests:
+    needs: code-quality
+    uses: ./.github/workflows/tests.yml
+
+  # ---------- Stage 3: Security scans (run in parallel once tests pass) ----------
+  dependency-scan:
+    needs: tests
+    uses: ./.github/workflows/dependency-scan.yml
+
+  sast:
+    needs: tests
+    uses: ./.github/workflows/sast.yml
+    secrets: inherit
+
+  sonarqube-scan:
+    needs: tests
+    uses: ./.github/workflows/sonar-qube.yml
+    secrets: inherit
+
+  docker-scan:
+    needs: tests
+    uses: ./.github/workflows/docker-scan.yml
+    secrets: inherit
+
+  # ---------- Stage 4: DAST (needs a running instance of the app) ----------
+  dast:
+    needs: tests
+    uses: ./.github/workflows/dast.yml
+
+  # ---------- Stage 5: Push images to Docker Hub (only on main, only if every gate passed) ----------
+  docker-push:
+    needs: [ dependency-scan, sast, sonarqube-scan, docker-scan, dast ]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    uses: ./.github/workflows/docker-push.yml
+    secrets: inherit
