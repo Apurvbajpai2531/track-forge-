@@ -1,0 +1,50 @@
+name: Code Quality
+
+on:
+  workflow_call:  
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            frontend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 black
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 black
+
+      - name: Run flake8 (backend)
+        working-directory: backend
+        run: flake8 . --max-line-length=120 --exclude=venv,__pycache__
+
+      - name: Run flake8 (frontend)
+        working-directory: frontend
+        run: flake8 . --max-line-length=120 --exclude=venv,__pycache__
+
+      - name: Check formatting with black (backend)
+        working-directory: backend
+        run: black --check .
+
+      - name: Check formatting with black (frontend)
+        working-directory: frontend
+        run: black --check .
