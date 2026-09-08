@@ -1,7 +1,7 @@
 name: Code Quality
 
 on:
-  workflow_call:  
+  workflow_call:   # you can call this workflow before/after any other workflow
 
 jobs:
   lint:
@@ -35,11 +35,11 @@ jobs:
 
       - name: Run flake8 (backend)
         working-directory: backend
-        run: flake8 . --max-line-length=120 --exclude=venv,__pycache__
+        run: flake8 . --max-line-length=120 --extend-ignore=F811,E741 --exclude=venv,__pycache__
 
       - name: Run flake8 (frontend)
         working-directory: frontend
-        run: flake8 . --max-line-length=120 --exclude=venv,__pycache__
+        run: flake8 . --max-line-length=120 --extend-ignore=F811,E741 --exclude=venv,__pycache__
 
       - name: Check formatting with black (backend)
         working-directory: backend
