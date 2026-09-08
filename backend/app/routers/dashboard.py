@@ -22,6 +22,4 @@ def dashboard(project_id: int, db: Session = Depends(get_db), current_user: User
         if issue.due_date and issue.due_date < now and issue.status.value != "done":
             overdue += 1
 
-    return DashboardStats(
-        total_issues=len(issues), by_status=by_status, by_priority=by_priority, overdue=overdue
-    )
+    return DashboardStats(total_issues=len(issues), by_status=by_status, by_priority=by_priority, overdue=overdue)

@@ -6,11 +6,7 @@ from functools import wraps
 
 import requests
 from requests.exceptions import RequestException
-from flask import (
-    Flask, render_template, request, redirect, url_for,
-    session, flash, Response, jsonify
-)
-
+from flask import Flask, render_template, request, redirect, url_for, session, flash, Response, jsonify
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FRONTEND_SECRET_KEY", "dev-secret-change-me")
@@ -36,7 +32,9 @@ def api_call(method, path, **kwargs):
         class _Unavailable:
             status_code = 503
             content = b""
-            def json(self): return {"detail": "Backend service unavailable."}
+
+            def json(self):
+                return {"detail": "Backend service unavailable."}
 
         return _Unavailable()
 
@@ -47,6 +45,7 @@ def login_required(view):
         if not session.get("token"):
             return redirect(url_for("login"))
         return view(*args, **kwargs)
+
     return wrapped
 
 
@@ -74,6 +73,7 @@ def server_error(e):
 
 
 # ===== Auth =====
+
 
 @app.route("/")
 def index():
@@ -141,6 +141,7 @@ def logout():
 
 # ===== Projects =====
 
+
 @app.route("/projects")
 @login_required
 def projects_list():
@@ -169,6 +170,7 @@ def project_new():
 
 # ===== Board =====
 
+
 @app.route("/projects/<int:project_id>/board")
 @login_required
 def board(project_id):
@@ -185,12 +187,7 @@ def board(project_id):
     if filter_type == "mine" and me.get("id"):
         params["assignee_id"] = me["id"]
 
-    issues_resp = api_call(
-        "GET",
-        f"/projects/{project_id}/issues",
-        params=params,
-        headers=api_headers()
-    )
+    issues_resp = api_call("GET", f"/projects/{project_id}/issues", params=params, headers=api_headers())
 
     project = project_resp.json() if project_resp.status_code == 200 else None
     data = issues_resp.json() if issues_resp.status_code == 200 else []
@@ -198,36 +195,20 @@ def board(project_id):
 
     if filter_type == "overdue":
         now = datetime.utcnow().isoformat()
-        issues = [
-            i for i in issues
-            if i.get("due_date")
-            and i["due_date"] < now
-            and i["status"] != "done"
-        ]
+        issues = [i for i in issues if i.get("due_date") and i["due_date"] < now and i["status"] != "done"]
 
-    columns = {
-        "todo": [],
-        "in_progress": [],
-        "in_review": [],
-        "done": []
-    }
+    columns = {"todo": [], "in_progress": [], "in_review": [], "done": []}
 
     for issue in issues:
         columns.setdefault(issue["status"], []).append(issue)
 
     total = sum(len(issue_list) for issue_list in columns.values())
 
-    return render_template(
-        "board.html",
-        project=project,
-        columns=columns,
-        total=total,
-        search=search,
-        filter_type=filter_type
-    )
+    return render_template("board.html", project=project, columns=columns, total=total, search=search, filter_type=filter_type)
 
 
 # ===== Issues =====
+
 
 @app.route("/projects/<int:project_id>/issues/new", methods=["GET", "POST"])
 @login_required
@@ -271,9 +252,7 @@ def issue_detail(project_id, issue_id):
     total_time = total_time_resp.json() if total_time_resp.status_code == 200 else {}
 
     return render_template(
-        "issue_detail.html",
-        issue=issue, comments=comments, activity=activity,
-        timelogs=timelogs, total_time=total_time, project_id=project_id
+        "issue_detail.html", issue=issue, comments=comments, activity=activity, timelogs=timelogs, total_time=total_time, project_id=project_id
     )
 
 
@@ -301,6 +280,7 @@ def log_time(project_id, issue_id):
 
 
 # ===== AJAX =====
+
 
 @app.route("/projects/<int:project_id>/issues/<int:issue_id>/json")
 @login_required
@@ -330,8 +310,7 @@ def move_issue(project_id, issue_id):
     new_status = (request.json or {}).get("status")
     if new_status not in ("todo", "in_progress", "in_review", "done"):
         return jsonify({"ok": False, "error": "Invalid status"}), 400
-    resp = api_call("PATCH", f"/projects/{project_id}/issues/{issue_id}",
-                    json={"status": new_status}, headers=api_headers())
+    resp = api_call("PATCH", f"/projects/{project_id}/issues/{issue_id}", json={"status": new_status}, headers=api_headers())
     if resp.status_code == 200:
         return jsonify({"ok": True})
     return jsonify({"ok": False, "error": "Failed to update"}), resp.status_code
@@ -355,12 +334,14 @@ def export_issues(project_id):
         flash("Could not export issues", "error")
         return redirect(url_for("board", project_id=project_id))
     return Response(
-        resp.content, mimetype="text/csv",
+        resp.content,
+        mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename=issues_{project_id}.csv"},
     )
 
 
 # ===== Dashboard =====
+
 
 @app.route("/projects/<int:project_id>/dashboard")
 @login_required
@@ -373,6 +354,7 @@ def project_dashboard(project_id):
 
 
 # ===== Sprints =====
+
 
 @app.route("/projects/<int:project_id>/sprints")
 @login_required
@@ -410,8 +392,7 @@ def sprint_new(project_id):
 @app.route("/projects/<int:project_id>/sprints/<int:sprint_id>/start")
 @login_required
 def sprint_start(project_id, sprint_id):
-    api_call("PATCH", f"/projects/{project_id}/sprints/{sprint_id}/status",
-             params={"status": "active"}, headers=api_headers())
+    api_call("PATCH", f"/projects/{project_id}/sprints/{sprint_id}/status", params={"status": "active"}, headers=api_headers())
     flash("Sprint started!", "success")
     return redirect(url_for("sprint_list", project_id=project_id))
 
@@ -419,13 +400,13 @@ def sprint_start(project_id, sprint_id):
 @app.route("/projects/<int:project_id>/sprints/<int:sprint_id>/complete")
 @login_required
 def sprint_complete(project_id, sprint_id):
-    api_call("PATCH", f"/projects/{project_id}/sprints/{sprint_id}/status",
-             params={"status": "completed"}, headers=api_headers())
+    api_call("PATCH", f"/projects/{project_id}/sprints/{sprint_id}/status", params={"status": "completed"}, headers=api_headers())
     flash("Sprint completed!", "success")
     return redirect(url_for("sprint_list", project_id=project_id))
 
 
 # ===== Roadmap =====
+
 
 @app.route("/projects/<int:project_id>/roadmap")
 @login_required
@@ -439,6 +420,7 @@ def roadmap(project_id):
 
 
 # ===== Profile =====
+
 
 @app.route("/profile")
 @login_required
@@ -468,6 +450,7 @@ def profile_update():
 
 # ===== Notifications =====
 
+
 @app.route("/notifications")
 @login_required
 def notifications_page():
@@ -492,6 +475,7 @@ def notifications_mark_all():
 
 
 # ===== Project Settings / Members / Templates =====
+
 
 @app.route("/projects/<int:project_id>/settings")
 @login_required
@@ -565,23 +549,16 @@ def issue_new_with_templates(project_id):
 
 # ===== AI features (via local Ollama) =====
 
+
 def call_ollama(prompt, max_tokens=400, json_mode=False):
     """Calls local Ollama instead of Anthropic. Raises on failure."""
     import requests as req
-    payload = {
-        "model": "llama3.2",
-        "prompt": prompt,
-        "stream": False,
-        "options": {"num_predict": max_tokens}
-    }
+
+    payload = {"model": "llama3.2", "prompt": prompt, "stream": False, "options": {"num_predict": max_tokens}}
     if json_mode:
         payload["format"] = "json"
 
-    resp = req.post(
-        "http://stockloom-ollama:11434/api/generate",
-        json=payload,
-        timeout=30
-    )
+    resp = req.post("http://stockloom-ollama:11434/api/generate", json=payload, timeout=30)
     if resp.status_code != 200:
         raise Exception(f"Ollama error: {resp.status_code} {resp.text}")
     return resp.json()["response"].strip()
@@ -624,13 +601,15 @@ Respond with ONLY valid JSON (no markdown, no explanation, no extra text before 
         # small models often break this rule even in json_mode
         data = json.loads(content.strip(), strict=False)
 
-        return jsonify({
-            "ok": True,
-            "title": data.get("title", ""),
-            "description": data.get("description", ""),
-            "type": data.get("type", "task"),
-            "priority": data.get("priority", "medium"),
-        })
+        return jsonify(
+            {
+                "ok": True,
+                "title": data.get("title", ""),
+                "description": data.get("description", ""),
+                "type": data.get("type", "task"),
+                "priority": data.get("priority", "medium"),
+            }
+        )
 
     except Exception as e:
         logger.error("AI generate error: %s", e)
@@ -654,8 +633,7 @@ def generate_standup(project_id):
 
     in_progress = [i for i in issues if i["status"] == "in_progress"]
     done_recently = [i for i in issues if i["status"] == "done"][:5]
-    overdue = [i for i in issues if i.get("due_date") and i["due_date"] <
-               datetime.utcnow().isoformat() and i["status"] != "done"]
+    overdue = [i for i in issues if i.get("due_date") and i["due_date"] < datetime.utcnow().isoformat() and i["status"] != "done"]
 
     context = f"""
     In Progress: {[i['title'] for i in in_progress[:5]]}
@@ -706,12 +684,7 @@ def ai_chat_usage():
 def ai_chat():
     usage = get_chat_usage()
     if usage["count"] >= CHAT_DAILY_LIMIT:
-        return jsonify({
-            "ok": False,
-            "error": "Daily message limit reached. Try again tomorrow.",
-            "remaining": 0,
-            "limit": CHAT_DAILY_LIMIT
-        }), 429
+        return jsonify({"ok": False, "error": "Daily message limit reached. Try again tomorrow.", "remaining": 0, "limit": CHAT_DAILY_LIMIT}), 429
 
     data = request.json or {}
     message = data.get("message", "").strip()

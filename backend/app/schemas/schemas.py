@@ -5,8 +5,8 @@ from pydantic import BaseModel, EmailStr
 
 from app.models.models import IssueStatus, IssuePriority, IssueType
 
-
 # ---------- Auth / Users ----------
+
 
 class UserCreate(BaseModel):
     username: str
@@ -38,6 +38,7 @@ class LoginRequest(BaseModel):
 
 # ---------- Projects ----------
 
+
 class ProjectCreate(BaseModel):
     key: str
     name: str
@@ -61,6 +62,7 @@ class ProjectMemberAdd(BaseModel):
 
 
 # ---------- Issues ----------
+
 
 class IssueCreate(BaseModel):
     title: str
@@ -103,6 +105,7 @@ class IssueOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 # ---------- Comments ----------
 
@@ -226,7 +229,7 @@ class IssueRelationOut(BaseModel):
 # ---------- Bulk Action ----------
 class BulkAction(BaseModel):
     issue_ids: List[int]
-    action: str          # "set_status", "set_priority", "delete"
+    action: str  # "set_status", "set_priority", "delete"
     value: Optional[str] = None
 
     # ---------- Checklist ----------

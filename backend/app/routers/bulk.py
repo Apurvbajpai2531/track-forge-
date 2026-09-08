@@ -10,15 +10,8 @@ router = APIRouter(prefix="/api/projects/{project_id}/bulk", tags=["bulk"])
 
 
 @router.post("")
-def bulk_action(
-        project_id: int,
-        payload: BulkAction,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)):
-    issues = db.query(Issue).filter(
-        Issue.project_id == project_id,
-        Issue.id.in_(payload.issue_ids)
-    ).all()
+def bulk_action(project_id: int, payload: BulkAction, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    issues = db.query(Issue).filter(Issue.project_id == project_id, Issue.id.in_(payload.issue_ids)).all()
 
     if not issues:
         raise HTTPException(404, "No matching issues found")

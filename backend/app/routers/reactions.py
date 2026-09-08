@@ -22,13 +22,10 @@ ALLOWED = {"👍", "❤️", "😂", "🎉", "🔥", "👀", "😢", "🚀"}
 
 
 @router.post("/{emoji}")
-def toggle_reaction(
-        comment_id: int,
-        emoji: str,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)):
+def toggle_reaction(comment_id: int, emoji: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if emoji not in ALLOWED:
         from fastapi import HTTPException
+
         raise HTTPException(400, "Emoji not allowed")
     existing = db.query(CommentReaction).filter_by(comment_id=comment_id, user_id=current_user.id, emoji=emoji).first()
     if existing:

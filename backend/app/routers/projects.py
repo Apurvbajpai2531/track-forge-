@@ -19,9 +19,7 @@ def create_project(
     if db.query(Project).filter(Project.key == payload.key.upper()).first():
         raise HTTPException(400, "Project key already exists")
 
-    project = Project(
-        key=payload.key.upper(), name=payload.name, description=payload.description
-    )
+    project = Project(key=payload.key.upper(), name=payload.name, description=payload.description)
     db.add(project)
     db.commit()
     db.refresh(project)

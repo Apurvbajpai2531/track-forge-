@@ -26,10 +26,18 @@ def export_issues_csv(
     writer = csv.writer(buffer)
     writer.writerow(["Key", "Title", "Status", "Priority", "Type", "Assignee ID", "Due Date", "Created At"])
     for issue in issues:
-        writer.writerow([
-            issue.key, issue.title, issue.status.value, issue.priority.value,
-            issue.type.value, issue.assignee_id or "", issue.due_date or "", issue.created_at,
-        ])
+        writer.writerow(
+            [
+                issue.key,
+                issue.title,
+                issue.status.value,
+                issue.priority.value,
+                issue.type.value,
+                issue.assignee_id or "",
+                issue.due_date or "",
+                issue.created_at,
+            ]
+        )
     buffer.seek(0)
 
     return StreamingResponse(
@@ -95,21 +103,12 @@ def list_issues(
         query = query.filter(Issue.title.ilike(f"%{search}%"))
 
     total = query.count()
-    items = (
-        query.order_by(Issue.id.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
+    items = query.order_by(Issue.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
     return PaginatedIssues(total=total, page=page, page_size=page_size, items=items)
 
 
 @router.get("/{issue_id}", response_model=IssueOut)
-def get_issue(
-        project_id: int,
-        issue_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)):
+def get_issue(project_id: int, issue_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     issue = db.query(Issue).filter_by(id=issue_id, project_id=project_id).first()
     if not issue:
         raise HTTPException(404, "Issue not found")
@@ -132,11 +131,13 @@ def update_issue(
     for field, value in changes.items():
         old_value = getattr(issue, field)
         if old_value != value:
-            db.add(ActivityLog(
-                issue_id=issue.id,
-                user_id=current_user.id,
-                action=f"changed {field} from '{old_value}' to '{value}'",
-            ))
+            db.add(
+                ActivityLog(
+                    issue_id=issue.id,
+                    user_id=current_user.id,
+                    action=f"changed {field} from '{old_value}' to '{value}'",
+                )
+            )
         setattr(issue, field, value)
 
     db.commit()
@@ -145,11 +146,7 @@ def update_issue(
 
 
 @router.delete("/{issue_id}", status_code=204)
-def delete_issue(
-        project_id: int,
-        issue_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)):
+def delete_issue(project_id: int, issue_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     issue = db.query(Issue).filter_by(id=issue_id, project_id=project_id).first()
     if not issue:
         raise HTTPException(404, "Issue not found")
@@ -159,14 +156,5 @@ def delete_issue(
 
 
 @router.get("/{issue_id}/activity", response_model=List[ActivityLogOut])
-def get_activity(
-        project_id: int,
-        issue_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)):
-    return (
-        db.query(ActivityLog)
-        .filter_by(issue_id=issue_id)
-        .order_by(ActivityLog.created_at.desc())
-        .all()
-    )
+def get_activity(project_id: int, issue_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return db.query(ActivityLog).filter_by(issue_id=issue_id).order_by(ActivityLog.created_at.desc()).all()

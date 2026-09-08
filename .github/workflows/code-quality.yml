@@ -43,8 +43,8 @@ jobs:
 
       - name: Check formatting with black (backend)
         working-directory: backend
-        run: black --check .
+        run: black --check --line-length=160 .
 
       - name: Check formatting with black (frontend)
         working-directory: frontend
-        run: black --check .
+        run: black --check --line-length=160 .

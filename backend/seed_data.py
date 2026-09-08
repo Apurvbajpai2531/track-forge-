@@ -11,10 +11,7 @@ from datetime import datetime, timedelta
 
 from app.core.database import Base, engine, SessionLocal
 from app.core.security import hash_password
-from app.models.models import (
-    User, Project, ProjectMember, Issue, IssueStatus, IssuePriority,
-    IssueType, Label, IssueLabel, Comment
-)
+from app.models.models import User, Project, ProjectMember, Issue, IssueStatus, IssuePriority, IssueType, Label, IssueLabel, Comment
 
 Base.metadata.create_all(bind=engine)
 db = SessionLocal()
@@ -31,7 +28,9 @@ try:
         alice = db.query(User).filter(User.username == "alice").first()
         if not alice:
             alice = User(
-                username="alice", email="alice@example.com", full_name="Alice Johnson",
+                username="alice",
+                email="alice@example.com",
+                full_name="Alice Johnson",
                 hashed_password=hash_password("password123"),
             )
             db.add(alice)
@@ -41,7 +40,9 @@ try:
         bob = db.query(User).filter(User.username == "bob").first()
         if not bob:
             bob = User(
-                username="bob", email="bob@example.com", full_name="Bob Smith",
+                username="bob",
+                email="bob@example.com",
+                full_name="Bob Smith",
                 hashed_password=hash_password("password123"),
             )
             db.add(bob)
@@ -50,7 +51,7 @@ try:
 
         project = Project(
             key=PROJECT_KEY,
-            name="Quick Demo Board",       # <-- temporary project name, change if you like
+            name="Quick Demo Board",  # <-- temporary project name, change if you like
             description="Auto-seeded demo project with sample issues.",
             issue_seq=0,
         )
@@ -58,10 +59,12 @@ try:
         db.commit()
         db.refresh(project)
 
-        db.add_all([
-            ProjectMember(project_id=project.id, user_id=alice.id, role="admin"),
-            ProjectMember(project_id=project.id, user_id=bob.id, role="member"),
-        ])
+        db.add_all(
+            [
+                ProjectMember(project_id=project.id, user_id=alice.id, role="admin"),
+                ProjectMember(project_id=project.id, user_id=bob.id, role="member"),
+            ]
+        )
         db.commit()
 
         label_bug = Label(project_id=project.id, name="bug", color="#e25563")
@@ -99,8 +102,7 @@ try:
         for i, title in enumerate(titles[:12]):  # 12 issues
             project.issue_seq += 1
             status = statuses[i % 4]  # cycles evenly through all 4 columns
-            due = (datetime.utcnow() + timedelta(days=random.choice([-2, 1, 3, 7, 14]))
-                   if random.random() > 0.4 else None)
+            due = datetime.utcnow() + timedelta(days=random.choice([-2, 1, 3, 7, 14])) if random.random() > 0.4 else None
 
             issue = Issue(
                 key=f"{project.key}-{project.issue_seq}",
@@ -126,8 +128,7 @@ try:
             db.add(IssueLabel(issue_id=issue.id, label_id=random.choice([label_bug.id, label_ui.id, label_urgent.id])))
 
         for issue in random.sample(created, k=4):
-            db.add(Comment(issue_id=issue.id, author_id=random.choice([alice.id, bob.id]),
-                           body="Looks good, just double-checking the edge cases."))
+            db.add(Comment(issue_id=issue.id, author_id=random.choice([alice.id, bob.id]), body="Looks good, just double-checking the edge cases."))
 
         db.commit()
 

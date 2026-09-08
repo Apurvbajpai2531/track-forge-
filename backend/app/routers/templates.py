@@ -11,11 +11,7 @@ router = APIRouter(prefix="/api/projects/{project_id}/templates", tags=["templat
 
 
 @router.post("", response_model=IssueTemplateOut, status_code=201)
-def create_template(
-        project_id: int,
-        payload: IssueTemplateCreate,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)):
+def create_template(project_id: int, payload: IssueTemplateCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not db.query(Project).get(project_id):
         raise HTTPException(404, "Project not found")
     tmpl = IssueTemplate(project_id=project_id, **payload.model_dump())
@@ -31,11 +27,7 @@ def list_templates(project_id: int, db: Session = Depends(get_db), current_user:
 
 
 @router.delete("/{template_id}", status_code=204)
-def delete_template(
-        project_id: int,
-        template_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)):
+def delete_template(project_id: int, template_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     tmpl = db.query(IssueTemplate).filter_by(id=template_id, project_id=project_id).first()
     if not tmpl:
         raise HTTPException(404, "Template not found")

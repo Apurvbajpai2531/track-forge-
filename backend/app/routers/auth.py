@@ -9,7 +9,6 @@ from app.schemas.schemas import UserCreate, UserOut, Token, LoginRequest
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 

@@ -7,11 +7,7 @@ from app.models import models  # noqa
 from app.routers import auth, projects, issues, comments, labels, dashboard, sprints, timelogs, bulk
 from app.routers import reactions
 
-from app.routers import (
-    auth, projects, issues, comments, labels,
-    dashboard, sprints, timelogs, bulk,
-    checklist, notifications, templates, profile
-)
+from app.routers import auth, projects, issues, comments, labels, dashboard, sprints, timelogs, bulk, checklist, notifications, templates, profile
 
 app = FastAPI(title="TrackForge API", version="2.0.0")
 
