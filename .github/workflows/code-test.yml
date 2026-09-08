@@ -17,7 +17,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U trackforge"
+          --health-cmd "pg_isready -U trackforge -d trackforge_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
@@ -37,11 +37,22 @@ jobs:
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
+
+      - name: Verify Backend Structure
+        working-directory: backend
+        run: |
+          pwd
+          ls -la
+          ls -la app
+          python -c "import sys; print(sys.path)"
+          python -c "from app.main import app; print('App import successful')"
 
       - name: Run Backend Tests
         working-directory: backend
         env:
+          PYTHONPATH: ${{ github.workspace }}/backend
           DATABASE_URL: "postgresql+psycopg2://trackforge:trackforge@localhost:5432/trackforge_test"
           SECRET_KEY: "ci-test-secret-key"
-        run: pytest app/tests
+        run: |
+          python -m pytest app/tests -v
