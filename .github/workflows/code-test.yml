@@ -1,4 +1,4 @@
-```yaml
+
 name: Code Tests
 
 on:
@@ -50,4 +50,3 @@ jobs:
           PYTHONPATH: .
         run: |
           python -m pytest app/tests -v
-```
