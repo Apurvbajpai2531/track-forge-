@@ -23,36 +23,25 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
 
-      - name: Install Backend Dependencies
+      - name: Install Dependencies
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          pip install -r requirements.txt
 
-      - name: Verify Backend Structure
-        working-directory: backend
-        run: |
-          pwd
-          ls -la
-          ls -la app
-          python -c "import sys; print(sys.path)"
-          python -c "from app.main import app; print('App import successful')"
-
-      - name: Run Backend Tests
+      - name: Run Tests
         working-directory: backend
         env:
-          PYTHONPATH: ${{ github.workspace }}/backend
-          DATABASE_URL: "postgresql+psycopg2://trackforge:trackforge@localhost:5432/trackforge_test"
-          SECRET_KEY: "ci-test-secret-key"
+          PYTHONPATH: .
+          DATABASE_URL: postgresql+psycopg2://trackforge:trackforge@localhost:5432/trackforge_test
+          SECRET_KEY: ci-test-secret-key
         run: |
           python -m pytest app/tests -v
