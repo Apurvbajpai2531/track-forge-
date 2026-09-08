@@ -1,3 +1,4 @@
+```yaml
 name: Code Tests
 
 on:
@@ -8,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
-      postgres:
+      db:
         image: postgres:16
         env:
           POSTGRES_USER: trackforge
@@ -31,25 +32,22 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Dependencies
+      - name: Install dependencies
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create Database Tables
+      - name: Create .env
         working-directory: backend
-        env:
-          DATABASE_URL: postgresql+psycopg2://trackforge:trackforge@localhost:5432/trackforge_test
-          SECRET_KEY: ci-test-secret-key
         run: |
-          python -c "from app.core.database import Base, engine; Base.metadata.create_all(bind=engine)"
+          echo "DATABASE_URL=postgresql+psycopg2://trackforge:trackforge@localhost:5432/trackforge_test" > .env
+          echo "SECRET_KEY=trackforge-backend-secret-key-change-later" >> .env
 
-      - name: Run Tests
+      - name: Run tests
         working-directory: backend
         env:
           PYTHONPATH: .
-          DATABASE_URL: postgresql+psycopg2://trackforge:trackforge@localhost:5432/trackforge_test
-          SECRET_KEY: ci-test-secret-key
         run: |
           python -m pytest app/tests -v
+```
