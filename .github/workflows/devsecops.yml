@@ -12,38 +12,36 @@ jobs:
     uses: ./.github/workflows/code-quality.yml
 
   # ---------- Stage 2: Tests (needs quality to pass first) ----------
-  tests:
+  code-test:
     needs: code-quality
-    uses: ./.github/workflows/tests.yml
+    uses: ./.github/workflows/code-test.yml
 
-  # ---------- Stage 3: Security scans (run in parallel once tests pass) ----------
+  # ---------- Stage 3: Secret scanning (run early, independent of tests) ----------
+  secret-scanning:
+    needs: code-quality
+    uses: ./.github/workflows/secret-scanning.yml
+
+  # ---------- Stage 4: Security scans (run in parallel once tests pass) ----------
   dependency-scan:
-    needs: tests
+    needs: code-test
     uses: ./.github/workflows/dependency-scan.yml
 
   sast:
-    needs: tests
+    needs: code-test
     uses: ./.github/workflows/sast.yml
     secrets: inherit
 
-  sonarqube-scan:
-    needs: tests
+  sonar-qube:
+    needs: code-test
     uses: ./.github/workflows/sonar-qube.yml
     secrets: inherit
 
-  docker-scan:
-    needs: tests
-    uses: ./.github/workflows/docker-scan.yml
+  docker-scans:
+    needs: code-test
+    uses: ./.github/workflows/docker-scans.yml
     secrets: inherit
 
-  # ---------- Stage 4: DAST (needs a running instance of the app) ----------
+  # ---------- Stage 5: DAST (needs a running instance of the app) ----------
   dast:
-    needs: tests
+    needs: code-test
     uses: ./.github/workflows/dast.yml
-
-  # ---------- Stage 5: Push images to Docker Hub (only on main, only if every gate passed) ----------
-  docker-push:
-    needs: [ dependency-scan, sast, sonarqube-scan, docker-scan, dast ]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    uses: ./.github/workflows/docker-push.yml
-    secrets: inherit
