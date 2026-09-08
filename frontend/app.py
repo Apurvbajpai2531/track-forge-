@@ -109,6 +109,7 @@ def login():
         flash("Invalid username or password", "error")
     return render_template("login.html")
 
+
 @app.route("/welcome")
 @login_required
 def welcome():
@@ -130,6 +131,7 @@ def welcome():
             stats = stats_resp.json()
 
     return render_template("welcome.html", user=user, stats=stats, project=last_project)
+
 
 @app.route("/logout")
 def logout():
@@ -222,7 +224,7 @@ def board(project_id):
         total=total,
         search=search,
         filter_type=filter_type
-    )   
+    )
 
 
 # ===== Issues =====
@@ -232,13 +234,13 @@ def board(project_id):
 def issue_new(project_id):
     if request.method == "POST":
         payload = {
-    "title": request.form["title"],
-    "description": request.form.get("description", ""),
-    "priority": request.form.get("priority", "medium"),
-    "type": request.form.get("type", "task"),
-    "due_date": request.form.get("due_date") or None,
-    "story_points": int(request.form["story_points"]) if request.form.get("story_points") else None,
-}
+            "title": request.form["title"],
+            "description": request.form.get("description", ""),
+            "priority": request.form.get("priority", "medium"),
+            "type": request.form.get("type", "task"),
+            "due_date": request.form.get("due_date") or None,
+            "story_points": int(request.form["story_points"]) if request.form.get("story_points") else None,
+        }
         resp = api_call("POST", f"/projects/{project_id}/issues", json=payload, headers=api_headers())
         if resp.status_code == 201:
             return redirect(url_for("board", project_id=project_id))
@@ -328,7 +330,8 @@ def move_issue(project_id, issue_id):
     new_status = (request.json or {}).get("status")
     if new_status not in ("todo", "in_progress", "in_review", "done"):
         return jsonify({"ok": False, "error": "Invalid status"}), 400
-    resp = api_call("PATCH", f"/projects/{project_id}/issues/{issue_id}", json={"status": new_status}, headers=api_headers())
+    resp = api_call("PATCH", f"/projects/{project_id}/issues/{issue_id}",
+                    json={"status": new_status}, headers=api_headers())
     if resp.status_code == 200:
         return jsonify({"ok": True})
     return jsonify({"ok": False, "error": "Failed to update"}), resp.status_code
@@ -407,7 +410,8 @@ def sprint_new(project_id):
 @app.route("/projects/<int:project_id>/sprints/<int:sprint_id>/start")
 @login_required
 def sprint_start(project_id, sprint_id):
-    api_call("PATCH", f"/projects/{project_id}/sprints/{sprint_id}/status", params={"status": "active"}, headers=api_headers())
+    api_call("PATCH", f"/projects/{project_id}/sprints/{sprint_id}/status",
+             params={"status": "active"}, headers=api_headers())
     flash("Sprint started!", "success")
     return redirect(url_for("sprint_list", project_id=project_id))
 
@@ -415,7 +419,8 @@ def sprint_start(project_id, sprint_id):
 @app.route("/projects/<int:project_id>/sprints/<int:sprint_id>/complete")
 @login_required
 def sprint_complete(project_id, sprint_id):
-    api_call("PATCH", f"/projects/{project_id}/sprints/{sprint_id}/status", params={"status": "completed"}, headers=api_headers())
+    api_call("PATCH", f"/projects/{project_id}/sprints/{sprint_id}/status",
+             params={"status": "completed"}, headers=api_headers())
     flash("Sprint completed!", "success")
     return redirect(url_for("sprint_list", project_id=project_id))
 
@@ -431,7 +436,6 @@ def roadmap(project_id):
     data = issues_resp.json() if issues_resp.status_code == 200 else []
     issues = data.get("items", data) if isinstance(data, dict) else data
     return render_template("roadmap.html", project=project, issues=issues, project_id=project_id)
-
 
 
 # ===== Profile =====
@@ -602,12 +606,11 @@ def ai_generate_issue():
 Description: {prompt}
 
 Respond with ONLY valid JSON (no markdown, no explanation, no extra text before or after). Use \\n for line breaks inside string values, never literal newlines:
-{{
-  "title": "concise issue title under 60 chars",
+{"title": "concise issue title under 60 chars",
   "description": "## Problem\\nDetailed description\\n\\n## Steps to Reproduce\\n1. \\n\\n## Expected\\n\\n## Actual\\n",
   "type": "bug or task or story or epic",
   "priority": "low or medium or high or critical"
-}}"""
+} """
 
         content = call_ollama(full_prompt, max_tokens=600, json_mode=True)
 
@@ -651,7 +654,8 @@ def generate_standup(project_id):
 
     in_progress = [i for i in issues if i["status"] == "in_progress"]
     done_recently = [i for i in issues if i["status"] == "done"][:5]
-    overdue = [i for i in issues if i.get("due_date") and i["due_date"] < datetime.utcnow().isoformat() and i["status"] != "done"]
+    overdue = [i for i in issues if i.get("due_date") and i["due_date"] <
+               datetime.utcnow().isoformat() and i["status"] != "done"]
 
     context = f"""
     In Progress: {[i['title'] for i in in_progress[:5]]}
