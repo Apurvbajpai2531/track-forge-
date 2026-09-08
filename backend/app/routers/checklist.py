@@ -11,7 +11,11 @@ router = APIRouter(prefix="/api/issues/{issue_id}/checklist", tags=["checklist"]
 
 
 @router.post("", response_model=ChecklistItemOut, status_code=201)
-def add_item(issue_id: int, payload: ChecklistItemCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def add_item(
+        issue_id: int,
+        payload: ChecklistItemCreate,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)):
     if not db.query(Issue).get(issue_id):
         raise HTTPException(404, "Issue not found")
     item = ChecklistItem(issue_id=issue_id, text=payload.text, position=payload.position)
@@ -27,7 +31,8 @@ def list_items(issue_id: int, db: Session = Depends(get_db), current_user: User 
 
 
 @router.patch("/{item_id}/toggle", response_model=ChecklistItemOut)
-def toggle_item(issue_id: int, item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def toggle_item(issue_id: int, item_id: int, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
     item = db.query(ChecklistItem).filter_by(id=item_id, issue_id=issue_id).first()
     if not item:
         raise HTTPException(404, "Item not found")
@@ -38,7 +43,8 @@ def toggle_item(issue_id: int, item_id: int, db: Session = Depends(get_db), curr
 
 
 @router.delete("/{item_id}", status_code=204)
-def delete_item(issue_id: int, item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_item(issue_id: int, item_id: int, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)):
     item = db.query(ChecklistItem).filter_by(id=item_id, issue_id=issue_id).first()
     if not item:
         raise HTTPException(404, "Item not found")

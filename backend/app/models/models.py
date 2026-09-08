@@ -98,11 +98,20 @@ class Issue(Base):
     activity_logs = relationship("ActivityLog", back_populates="issue", cascade="all, delete-orphan")
     sprint_entries = relationship("SprintIssue", back_populates="issue", cascade="all, delete-orphan")
     time_logs = relationship("TimeLog", back_populates="issue", cascade="all, delete-orphan")
-    outgoing_relations = relationship("IssueRelation", foreign_keys="IssueRelation.from_issue_id", back_populates="from_issue", cascade="all, delete-orphan")
-    incoming_relations = relationship("IssueRelation", foreign_keys="IssueRelation.to_issue_id", back_populates="to_issue", cascade="all, delete-orphan")
+    outgoing_relations = relationship(
+        "IssueRelation",
+        foreign_keys="IssueRelation.from_issue_id",
+        back_populates="from_issue",
+        cascade="all, delete-orphan")
+    incoming_relations = relationship(
+        "IssueRelation",
+        foreign_keys="IssueRelation.to_issue_id",
+        back_populates="to_issue",
+        cascade="all, delete-orphan")
     checklist_items = relationship("ChecklistItem", back_populates="issue", cascade="all, delete-orphan")
 
     story_points = Column(Integer, nullable=True)
+
 
 class Comment(Base):
     __tablename__ = "comments"

@@ -7,7 +7,6 @@ from app.models import models  # noqa
 from app.routers import auth, projects, issues, comments, labels, dashboard, sprints, timelogs, bulk
 from app.routers import reactions
 
-from app.routers.reactions import CommentReaction
 from app.routers import (
     auth, projects, issues, comments, labels,
     dashboard, sprints, timelogs, bulk,
@@ -39,6 +38,7 @@ app.include_router(checklist.router)
 app.include_router(templates.router)
 app.include_router(profile.router)
 
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
@@ -55,4 +55,3 @@ def on_startup():
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "trackforge-api", "version": "2.0.0"}
-

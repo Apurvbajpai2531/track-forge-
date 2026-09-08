@@ -105,7 +105,11 @@ def list_issues(
 
 
 @router.get("/{issue_id}", response_model=IssueOut)
-def get_issue(project_id: int, issue_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_issue(
+        project_id: int,
+        issue_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)):
     issue = db.query(Issue).filter_by(id=issue_id, project_id=project_id).first()
     if not issue:
         raise HTTPException(404, "Issue not found")
@@ -141,7 +145,11 @@ def update_issue(
 
 
 @router.delete("/{issue_id}", status_code=204)
-def delete_issue(project_id: int, issue_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def delete_issue(
+        project_id: int,
+        issue_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)):
     issue = db.query(Issue).filter_by(id=issue_id, project_id=project_id).first()
     if not issue:
         raise HTTPException(404, "Issue not found")
@@ -151,11 +159,14 @@ def delete_issue(project_id: int, issue_id: int, db: Session = Depends(get_db), 
 
 
 @router.get("/{issue_id}/activity", response_model=List[ActivityLogOut])
-def get_activity(project_id: int, issue_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_activity(
+        project_id: int,
+        issue_id: int,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)):
     return (
         db.query(ActivityLog)
         .filter_by(issue_id=issue_id)
         .order_by(ActivityLog.created_at.desc())
         .all()
     )
-

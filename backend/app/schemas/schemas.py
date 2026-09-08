@@ -74,9 +74,6 @@ class IssueCreate(BaseModel):
     story_points: Optional[int] = None
 
 
-
-
-
 class IssueUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
@@ -109,6 +106,7 @@ class IssueOut(BaseModel):
 
 # ---------- Comments ----------
 
+
 class CommentCreate(BaseModel):
     body: str
 
@@ -122,6 +120,7 @@ class CommentOut(BaseModel):
 
     class Config:
         from_attributes = True
+
 
 class LabelCreate(BaseModel):
     name: str
@@ -163,6 +162,8 @@ class PaginatedIssues(BaseModel):
     items: List[IssueOut]
 
     # ---------- Sprints ----------
+
+
 class SprintCreate(BaseModel):
     name: str
     goal: Optional[str] = None
@@ -228,9 +229,9 @@ class BulkAction(BaseModel):
     action: str          # "set_status", "set_priority", "delete"
     value: Optional[str] = None
 
-
-
     # ---------- Checklist ----------
+
+
 class ChecklistItemCreate(BaseModel):
     text: str
     position: int = 0
@@ -289,5 +290,3 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
-
-

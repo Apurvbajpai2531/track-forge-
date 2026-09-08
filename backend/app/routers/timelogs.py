@@ -11,7 +11,11 @@ router = APIRouter(prefix="/api/issues/{issue_id}/timelogs", tags=["timelogs"])
 
 
 @router.post("", response_model=TimeLogOut, status_code=201)
-def log_time(issue_id: int, payload: TimeLogCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def log_time(
+        issue_id: int,
+        payload: TimeLogCreate,
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)):
     if not db.query(Issue).get(issue_id):
         raise HTTPException(404, "Issue not found")
     log = TimeLog(issue_id=issue_id, user_id=current_user.id, **payload.model_dump())

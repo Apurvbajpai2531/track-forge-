@@ -69,7 +69,9 @@ try:
         label_urgent = Label(project_id=project.id, name="urgent", color="#f2b94b")
         db.add_all([label_bug, label_ui, label_urgent])
         db.commit()
-        db.refresh(label_bug); db.refresh(label_ui); db.refresh(label_urgent)
+        db.refresh(label_bug)
+        db.refresh(label_ui)
+        db.refresh(label_urgent)
 
         statuses = [IssueStatus.todo, IssueStatus.in_progress, IssueStatus.in_review, IssueStatus.done]
         priorities = [IssuePriority.low, IssuePriority.medium, IssuePriority.high, IssuePriority.critical]
@@ -125,7 +127,7 @@ try:
 
         for issue in random.sample(created, k=4):
             db.add(Comment(issue_id=issue.id, author_id=random.choice([alice.id, bob.id]),
-                            body="Looks good, just double-checking the edge cases."))
+                           body="Looks good, just double-checking the edge cases."))
 
         db.commit()
 
