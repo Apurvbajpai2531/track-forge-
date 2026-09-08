@@ -37,6 +37,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Create Database Tables
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg2://trackforge:trackforge@localhost:5432/trackforge_test
+          SECRET_KEY: ci-test-secret-key
+        run: |
+          python -c "from app.core.database import Base, engine; Base.metadata.create_all(bind=engine)"
+
       - name: Run Tests
         working-directory: backend
         env:
