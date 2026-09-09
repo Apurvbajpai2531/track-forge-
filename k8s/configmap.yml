@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config
+  namespace: trackforge
+data:
+  POSTGRES_USER: trackforge
+  POSTGRES_DB: trackforge

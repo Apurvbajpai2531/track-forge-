@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  namespace: trackforge
+  labels:
+    app: trackforge-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: trackforge-backend
+  template:
+    metadata:
+      labels:
+        app: trackforge-backend
+    spec:
+      containers:
+        - name: trackforge-backend
+          image: apurv25/trackforge-backend:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql+psycopg2://trackforge:trackforge@db:5432/trackforge"
+            - name: SECRET_KEY
+              value: "trackforge-backend-secret-key-change-later"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3

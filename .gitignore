@@ -38,4 +38,4 @@ desktop.ini
 # Test cache
 .pytest_cache/
 .coverage
-htmlcov/
+k8s/secrets.yml

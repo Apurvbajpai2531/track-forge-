@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: trackforge
+spec:
+  type: ClusterIP
+  selector:
+    app: trackforge-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
