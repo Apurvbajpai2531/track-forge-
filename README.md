@@ -1,123 +1,74 @@
-# TrackForge
+# TrackForge — Docker & Nginx Setup
 
-A Jira-style issue tracker — built with a **FastAPI** backend, **PostgreSQL** database, and a
-**Flask** (Python) frontend. No containers, CI, or deployment config included on purpose —
-that part is left for you to add later (DevOps phase).
+This document covers the containerization work done for TrackForge so far:
+Dockerizing the backend/frontend, wiring them together with Docker Compose,
+and adding an Nginx reverse proxy in front of both services.
 
-## Architecture
+## 1. Dockerfile (backend & frontend)
 
-```
-trackforge/
-├── backend/                FastAPI REST API + SQLAlchemy models + Postgres
-│   ├── app/
-│   │   ├── core/            config, db session, security (JWT + bcrypt), deps
-│   │   ├── models/          SQLAlchemy ORM models
-│   │   ├── schemas/         Pydantic request/response schemas
-│   │   ├── routers/         auth, projects, issues, comments, labels, dashboard
-│   │   └── main.py
-│   ├── tests/                pytest test suite
-│   ├── requirements.txt
-│   └── .env.example
-└── frontend/                Flask server-rendered UI (Jinja2 + plain CSS/JS)
-    ├── templates/
-    ├── static/css/
-    ├── app.py
-    ├── requirements.txt
-    └── .env.example
-```
+- Multi-stage `Dockerfile` for both `backend/` and `frontend/`:
+  - **Stage 1 (builder)** — installs Python dependencies with
+    `pip install --user --no-cache-dir -r requirements.txt`.
+  - **Stage 2 (runtime)** — uses a `python:3.12-slim` base, copies only the
+    installed packages from the builder stage, then copies the app code.
+- Backend runs via `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+- Frontend runs via `python app.py`, listening on `0.0.0.0:5000`.
+- Images built locally and pushed to Docker Hub:
+  `apurv25/trackforge-backend` and `apurv25/trackforge-frontend`.
 
-## Features
+## 2. Docker Compose
 
-**Core**
-- JWT auth (register / login / `me`) with bcrypt password hashing
-- Projects with unique keys (e.g. `TF`) and project members (admin/member roles)
-- Issues with type (bug/task/story/epic), priority, status, assignee — auto-numbered keys like `TF-1`, `TF-2`
-- Kanban board view (To Do / In Progress / In Review / Done)
-- Comments on issues
+- `docker-compose.yml` orchestrates three app-level services plus nginx, all on
+  a shared bridge network (`trackforge-net`):
+  - **db** — Postgres 16, with a healthcheck (`pg_isready`) so dependent
+    services wait until it's actually ready, not just started.
+  - **backend** — built from `backend/Dockerfile`, reads config from
+    `backend/.env`, connects to `db` via `DATABASE_URL`.
+  - **frontend** — built from `frontend/Dockerfile`, reads config from
+    `frontend/.env`, calls the backend via `API_BASE_URL`.
+- Backend and frontend don't publish ports directly to the host (`expose`
+  instead of `ports`) — all external traffic goes through nginx.
 
-**Added in this round**
-- **Due dates** on issues
-- **Labels** per project (create / list / delete, color-coded)
-- **Activity log** — every field change on an issue is recorded with who changed what
-- **Search & filter** — search issues by title, filter by status/priority/assignee
-- **Pagination** on the issues list endpoint
-- **Dashboard** per project — total issues, breakdown by status/priority, overdue count
-- **Rate limiting** on login (5/minute) via `slowapi` to slow down brute-force attempts
-- **Global exception handler** — backend never leaks stack traces, returns clean JSON errors
-- **Frontend resiliency** — centralized API call wrapper with timeouts, auto-logout on expired session, custom 404/500 pages
-- **Responsive UI** — mobile-first navbar, horizontally-scrollable Kanban board on small screens, fluid spacing, touch-friendly inputs
-- **Pytest test suite** for auth endpoints
+## 3. Nginx reverse proxy
 
-## 1. Set up PostgreSQL
+- Added an `nginx` service (`nginx:1.27-alpine`), the only container exposing
+  a port to the host (`80`), using a mounted `nginx.conf`.
+- Routing:
+  - `/api/` → backend (`backend:8000`)
+  - `/docs` → backend's FastAPI docs
+  - `/` → frontend (`frontend:5000`)
+- Fixed a port mismatch bug during setup: frontend's `app.run()` was listening
+  on `5000`, while nginx/compose were initially wired for `8000` — corrected
+  the upstream and `expose` port to `5000` to resolve a 502 Bad Gateway.
 
-```bash
-createdb trackforge
-psql -c "CREATE USER trackforge WITH PASSWORD 'trackforge';"
-psql -c "GRANT ALL PRIVILEGES ON DATABASE trackforge TO trackforge;"
-```
+## Screenshots
 
-Or point `DATABASE_URL` at any Postgres instance you already have.
+### Container list
+`docker compose ps` showing all containers running.
 
-> Note: new columns (e.g. `due_date`) and new tables (`labels`, `issue_labels`, `activity_logs`)
-> are only created automatically for a **fresh** database, since `Base.metadata.create_all()`
-> doesn't alter existing tables. If you already had the DB running before these features were
-> added, drop and recreate it (or set up Alembic migrations) to pick up the schema changes.
+![Container list](Screenshots/containerlist.png)
 
-## 2. Run the backend
+### Docker logs
+Container logs showing services starting up cleanly.
+
+![Docker logs](Screenshots/dockerlogs.png)
+
+### Nginx serving the app
+App accessible through nginx on `http://localhost`.
+
+![Nginx host](Screenshots/Nginx-Host.png)
+
+## How to run it
 
 ```bash
-cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+git clone <repo-url>
+cd track-forge-
 
-cp .env.example .env   # then edit DATABASE_URL / SECRET_KEY as needed
-export DATABASE_URL="postgresql+psycopg2://trackforge:trackforge@localhost:5432/trackforge"
-export SECRET_KEY="some-long-random-string"
+# create backend/.env and frontend/.env yourself (not committed — see .gitignore)
+# backend/.env needs: DATABASE_URL, SECRET_KEY
+# frontend/.env needs: API_BASE_URL, API_TIMEOUT_SECONDS, FRONTEND_SECRET_KEY
 
-uvicorn app.main:app --reload --port 8000
+docker compose up --build
 ```
 
-Tables are auto-created on startup. API docs: http://localhost:8000/docs
-
-### Run backend tests
-
-```bash
-cd backend
-pytest tests
-```
-
-## 3. Run the frontend
-
-```bash
-cd frontend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-
-cp .env.example .env   # then edit values as needed
-export API_BASE_URL="http://localhost:8000/api"
-export FRONTEND_SECRET_KEY="another-long-random-string"
-export API_TIMEOUT_SECONDS="5"
-
-python app.py
-```
-
-Visit http://localhost:5000 — sign up, create a project, start adding issues.
-
-## API Overview
-
-| Area       | Endpoints |
-|------------|-----------|
-| Auth       | `POST /api/auth/register`, `POST /api/auth/login` (rate-limited), `GET /api/auth/me` |
-| Projects   | `POST /api/projects`, `GET /api/projects`, `GET /api/projects/{id}`, `POST /api/projects/{id}/members`, `GET /api/projects/{id}/members` |
-| Issues     | `POST /api/projects/{id}/issues`, `GET /api/projects/{id}/issues` (search/filter/pagination), `GET /{issue_id}`, `PATCH /{issue_id}`, `DELETE /{issue_id}`, `GET /{issue_id}/activity` |
-| Labels     | `POST /api/projects/{id}/labels`, `GET /api/projects/{id}/labels`, `DELETE /api/projects/{id}/labels/{label_id}` |
-| Comments   | `POST /api/issues/{id}/comments`, `GET /api/issues/{id}/comments` |
-| Dashboard  | `GET /api/projects/{id}/dashboard` |
-| Health     | `GET /api/health` |
-
-## Notes for later (DevOps — intentionally left out)
-
-When you're ready, you can add: Dockerfiles for backend/frontend, docker-compose with a
-Postgres service, Alembic migrations (folder already has the dependency, just needs
-`alembic init`), Nginx reverse proxy, CI/CD pipeline (e.g. running the pytest suite on push),
-and environment-based secrets management.
+Visit `http://localhost` once all containers are up.
