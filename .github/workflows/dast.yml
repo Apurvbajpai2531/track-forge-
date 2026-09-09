@@ -10,6 +10,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Create CI env files
+        run: |
+          echo "SECRET_KEY=ci-dast-secret" > backend/.env
+          echo "FRONTEND_SECRET_KEY=ci-dast-frontend-secret" > frontend/.env
+          echo "API_TIMEOUT_SECONDS=5" >> frontend/.env
+
       - name: Start the stack with Docker Compose
         run: docker compose up -d --build
 
