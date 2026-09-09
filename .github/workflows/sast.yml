@@ -2,6 +2,9 @@ name: SAST
 
 on:
   workflow_call:
+    secrets:
+      SEMGREP_APP_TOKEN:
+        required: false
 
 jobs:
   semgrep:
