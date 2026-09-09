@@ -20,6 +20,10 @@ ENV PATH=/root/.local/bin:$PATH
 COPY . .
 
 EXPOSE 8000
+RUN useradd -m appuser
+USER appuser
+RUN useradd -m appuser
+USER appuser
 
 CMD ["python", "app.py"]
 

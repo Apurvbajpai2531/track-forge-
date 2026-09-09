@@ -31,19 +31,22 @@ jobs:
     name: SAST - Semgrep
     needs: tests
     uses: ./.github/workflows/sast.yml
-    secrets: inherit
+    secrets:
+      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
   code-analysis:
     name: Code Analysis - SonarQube
     needs: tests
     uses: ./.github/workflows/sonar-qube.yml
-    secrets: inherit
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   image-scan:
     name: Docker Image Scan
     needs: tests
     uses: ./.github/workflows/docker-scans.yml
-    secrets: inherit
+    secrets:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   dynamic-analysis:
     name: DAST - OWASP ZAP
