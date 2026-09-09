@@ -6,7 +6,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
-RUN echo "Stage 1 is succeed" 
+RUN echo "Stage 1 is succeed"
 
 # ---------- Stage 2: runtime ----------
 FROM python:3.12-slim
@@ -22,11 +22,7 @@ COPY . .
 EXPOSE 8000
 RUN useradd -m appuser
 USER appuser
-RUN useradd -m appuser
-USER appuser
 
 CMD ["python", "app.py"]
 
 RUN echo "Stage 2 is succeed"
-
-#-------------------------------------------------
