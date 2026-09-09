@@ -19,16 +19,22 @@ jobs:
       - name: Start the stack with Docker Compose
         run: docker compose up -d --build
 
+      - name: Show container status
+        run: docker compose ps
+
       - name: Wait for frontend to be ready
         run: |
           for i in $(seq 1 30); do
             if curl -sf http://localhost:80 > /dev/null; then
               echo "App is up"
-              break
+              exit 0
             fi
-            echo "Waiting for app..."
+            echo "Waiting for app... attempt $i"
             sleep 5
           done
+          echo "App never became ready. Dumping logs:"
+          docker compose logs
+          exit 1
 
       - name: Run OWASP ZAP baseline scan
         uses: zaproxy/action-baseline@v0.12.0
