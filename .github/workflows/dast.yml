@@ -42,7 +42,7 @@ jobs:
           target: "http://localhost:80"
           fail_action: false
           allow_issue_writing: false
-          artifact_name: "zap-scan-${{ github.run_id }}-${{ github.run_attempt }}"
+          artifact_name: zap_scan_results
           cmd_options: "-a"
 
       - name: Tear down the stack
