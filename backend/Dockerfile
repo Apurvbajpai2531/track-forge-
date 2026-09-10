@@ -6,25 +6,24 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --user --no-cache-dir -r requirements.txt
 
-RUN echo "Stage 1 is succeed" 
+RUN echo "Stage 1 is succeed"
 
 # ---------- Stage 2: runtime ----------
 FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY --from=builder /root/.local /root/.local
+RUN useradd -m appuser
 
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+COPY --chown=appuser:appuser . .
 
-COPY . .
+ENV PATH=/home/appuser/.local/bin:$PATH
+
+USER appuser
 
 EXPOSE 8000
-RUN useradd -m appuser
-USER appuser
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 RUN echo "Stage 2 is succeed"
-
-#----------------------------------------------------

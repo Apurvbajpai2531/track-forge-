@@ -13,15 +13,16 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY --from=builder /root/.local /root/.local
+RUN useradd -m appuser
 
-ENV PATH=/root/.local/bin:$PATH
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+COPY --chown=appuser:appuser . .
 
-COPY . .
+ENV PATH=/home/appuser/.local/bin:$PATH
+
+USER appuser
 
 EXPOSE 8000
-RUN useradd -m appuser
-USER appuser
 
 CMD ["python", "app.py"]
 
