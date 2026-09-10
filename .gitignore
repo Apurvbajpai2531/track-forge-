@@ -39,3 +39,7 @@ desktop.ini
 .pytest_cache/
 .coverage
 k8s/secrets.yml
+
+# Environment files
+backend/.env
+frontend/.env
