@@ -33,7 +33,7 @@ jobs:
         working-directory: ${{ matrix.folders }}
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@master
         continue-on-error: true
         with:
           image-ref: ${{ vars.DOCKERHUB_USERNAME }}/trackforge-${{ matrix.folders }}:latest
