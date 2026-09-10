@@ -41,6 +41,7 @@ jobs:
         with:
           target: "http://localhost:80"
           fail_action: false
+          allow_issue_writing: false
           cmd_options: "-a"
 
       - name: Tear down the stack
