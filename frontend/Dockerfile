@@ -4,9 +4,8 @@ FROM python:3.12 AS builder
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
-
-RUN echo "Stage 1 is succeed"
+RUN pip install --user --no-cache-dir -r requirements.txt && \
+    echo "Stage 1 is succeed"
 
 # ---------- Stage 2: runtime ----------
 FROM python:3.12-slim
@@ -25,5 +24,3 @@ USER appuser
 EXPOSE 8000
 
 CMD ["python", "app.py"]
-
-RUN echo "Stage 2 is succeed"
