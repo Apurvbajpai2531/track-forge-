@@ -550,18 +550,41 @@ def issue_new_with_templates(project_id):
 # ===== AI features (via local Ollama) =====
 
 
-def call_ollama(prompt, max_tokens=400, json_mode=False):
-    """Calls local Ollama instead of Anthropic. Raises on failure."""
+
+def call_ai(prompt, max_tokens=400, json_mode=False):
+    """Calls Groq (production) or local Ollama (dev), based on AI_PROVIDER env var."""
     import requests as req
 
-    payload = {"model": "llama3.2", "prompt": prompt, "stream": False, "options": {"num_predict": max_tokens}}
-    if json_mode:
-        payload["format"] = "json"
+    provider = os.getenv("AI_PROVIDER", "groq")
 
-    resp = req.post("http://stockloom-ollama:11434/api/generate", json=payload, timeout=30)
+    if provider == "ollama":
+        ollama_url = os.getenv("OLLAMA_URL", "http://ollama:11434/api/generate")
+        payload = {"model": "llama3.2", "prompt": prompt, "stream": False, "options": {"num_predict": max_tokens}}
+        if json_mode:
+            payload["format"] = "json"
+        resp = req.post(ollama_url, json=payload, timeout=30)
+        if resp.status_code != 200:
+            raise Exception(f"Ollama error: {resp.status_code} {resp.text}")
+        return resp.json()["response"].strip()
+
+    # Default: Groq (OpenAI-compatible chat completions API)
+    groq_api_key = os.getenv("GROQ_API_KEY")
+    if not groq_api_key:
+        raise Exception("GROQ_API_KEY not set")
+
+    headers = {"Authorization": f"Bearer {groq_api_key}", "Content-Type": "application/json"}
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+    }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+
+    resp = req.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=30)
     if resp.status_code != 200:
-        raise Exception(f"Ollama error: {resp.status_code} {resp.text}")
-    return resp.json()["response"].strip()
+        raise Exception(f"Groq error: {resp.status_code} {resp.text}")
+    return resp.json()["choices"][0]["message"]["content"].strip()
 
 
 @app.route("/projects/<int:project_id>/ai-create")
@@ -589,7 +612,7 @@ Respond with ONLY valid JSON (no markdown, no explanation, no extra text before 
   "priority": "low or medium or high or critical"
 } """
 
-        content = call_ollama(full_prompt, max_tokens=600, json_mode=True)
+        content = call_ai(full_prompt, max_tokens=600, json_mode=True)
 
         # Strip markdown code fences if present
         if content.startswith("```"):
@@ -653,7 +676,7 @@ Format it as:
 
 Keep it brief, professional, under 100 words total."""
 
-        text = call_ollama(full_prompt, max_tokens=400)
+        text = call_ai(full_prompt, max_tokens=400)
         return jsonify({"ok": True, "standup": text})
     except Exception as e:
         logger.error("Standup generate error: %s", e)
@@ -708,7 +731,7 @@ def ai_chat():
         convo += f"User: {message}\nAssistant:"
 
         full_prompt = system_prefix + convo
-        reply = call_ollama(full_prompt, max_tokens=500)
+        reply = call_ai(full_prompt, max_tokens=500)
 
         usage["count"] += 1
         session["chat_usage"] = usage
