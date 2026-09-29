@@ -550,7 +550,6 @@ def issue_new_with_templates(project_id):
 # ===== AI features (via local Ollama) =====
 
 
-
 def call_ai(prompt, max_tokens=400, json_mode=False):
     """Calls Groq (production) or local Ollama (dev), based on AI_PROVIDER env var."""
     import requests as req
