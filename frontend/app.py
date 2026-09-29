@@ -574,7 +574,7 @@ def call_ai(prompt, max_tokens=400, json_mode=False):
 
     headers = {"Authorization": f"Bearer {groq_api_key}", "Content-Type": "application/json"}
     payload = {
-        "model": "llama-3.1-8b-instant",
+        "model": "openai/gpt-oss-20b",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
     }
