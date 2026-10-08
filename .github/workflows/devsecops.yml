@@ -38,8 +38,7 @@ jobs:
     name: Code Analysis - SonarQube
     needs: tests
     uses: ./.github/workflows/sonar-qube.yml
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    secrets: inherit
 
   image-scan:
     name: Docker Image Scan
