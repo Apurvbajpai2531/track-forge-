@@ -9,10 +9,9 @@ data "aws_subnets" "default" {
   }
 }
 
-# ---------- EC2 security group ----------
 resource "aws_security_group" "app" {
-  name        = "${var.project_name}-app-sg"
-  description = "Allow HTTP and SSH to TrackForge EC2 instance"
+  name        = "${var.name_prefix}-app-sg"
+  description = "HTTP from anywhere, SSH from my IP"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
@@ -24,7 +23,7 @@ resource "aws_security_group" "app" {
   }
 
   ingress {
-    description = "SSH (restricted to your IP)"
+    description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
@@ -39,14 +38,13 @@ resource "aws_security_group" "app" {
   }
 
   tags = {
-    Name = "${var.project_name}-app-sg"
+    Name = "${var.name_prefix}-app-sg"
   }
 }
 
-# ---------- RDS security group ----------
 resource "aws_security_group" "db" {
-  name        = "${var.project_name}-db-sg"
-  description = "Allow Postgres access only from the app EC2 instance"
+  name        = "${var.name_prefix}-db-sg"
+  description = "Postgres only from app SG"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
@@ -65,15 +63,15 @@ resource "aws_security_group" "db" {
   }
 
   tags = {
-    Name = "${var.project_name}-db-sg"
+    Name = "${var.name_prefix}-db-sg"
   }
 }
 
 resource "aws_db_subnet_group" "main" {
-  name       = "${var.project_name}-db-subnet-group"
+  name       = "${var.name_prefix}-db-subnet-group"
   subnet_ids = data.aws_subnets.default.ids
 
   tags = {
-    Name = "${var.project_name}-db-subnet-group"
+    Name = "${var.name_prefix}-db-subnet-group"
   }
 }

@@ -43,3 +43,12 @@ k8s/secrets.yml
 # Environment files
 backend/.env
 frontend/.env
+terraform/terraform.tfvars
+terraform/*.pem
+terraform/.terraform/
+terraform/terraform.tfstate*
+terraform/**/.terraform/
+terraform/**/terraform.tfstate*
+terraform/**/terraform.tfvars
+terraform/**/*.pem
+terraform-old-flat/
