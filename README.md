@@ -1,4 +1,4 @@
-# TrackForge — Kubernetes Setup(k8s)
+## TrackForge — Kubernetes Setup(k8s)
 
 This document covers moving TrackForge from Docker Compose to a local Kubernetes
 cluster using **kind** (Kubernetes in Docker) — namespace, Postgres, backend,
