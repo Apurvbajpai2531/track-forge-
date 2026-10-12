@@ -52,3 +52,5 @@ terraform/**/terraform.tfstate*
 terraform/**/terraform.tfvars
 terraform/**/*.pem
 terraform-old-flat/
+ansible/.vault_pass
+ansible/inventory.ini

@@ -1,0 +1,7 @@
+---
+app_dir: /opt/trackforge
+backend_image: apurv25/trackforge-backend:latest
+frontend_image: apurv25/trackforge-frontend:latest
+db_name: trackforge
+db_username: trackforge
+db_host: trackforge-dev-db.c5a0mwsgyuqa.ap-south-1.rds.amazonaws.com

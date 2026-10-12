@@ -1,0 +1,51 @@
+---
+- name: Deploy TrackForge
+  hosts: trackforge
+  become: true
+
+  tasks:
+    - name: Create the application directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Copy the nginx config
+      ansible.builtin.copy:
+        src: nginx.conf
+        dest: "{{ app_dir }}/nginx.conf"
+        mode: "0644"
+      notify: Restart nginx container
+
+    - name: Render docker-compose.yml from the template
+      ansible.builtin.template:
+        src: docker-compose.yml.j2
+        dest: "{{ app_dir }}/docker-compose.yml"
+        owner: ubuntu
+        group: ubuntu
+        mode: "0600"
+
+    - name: Pull images and start (or update) the stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        pull: always
+        state: present
+
+    - name: Wait until the app answers on port 80
+      ansible.builtin.uri:
+        url: http://localhost
+        status_code: [200, 302]
+      register: health
+      retries: 12
+      delay: 5
+      until: health.status in [200, 302]
+
+  handlers:
+    - name: Restart nginx container
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        services:
+          - nginx
+        state: restarted

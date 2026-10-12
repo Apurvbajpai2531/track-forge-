@@ -42,21 +42,12 @@ module "rds" {
 }
 
 module "ec2" {
-  source              = "../../modules/ec2"
-  name_prefix         = local.name_prefix
-  instance_type       = var.instance_type
-  key_pair_name       = var.key_pair_name
-  sg_id               = module.network.app_sg_id
-  subnet_id           = module.network.subnet_id
-  db_host             = module.rds.address
-  db_name             = var.db_name
-  db_username         = var.db_username
-  db_password         = var.db_password
-  backend_image       = var.backend_image
-  frontend_image      = var.frontend_image
-  backend_secret_key  = var.backend_secret_key
-  frontend_secret_key = var.frontend_secret_key
-  groq_api_key        = var.groq_api_key
+  source        = "../../modules/ec2"
+  name_prefix   = local.name_prefix
+  instance_type = var.instance_type
+  key_pair_name = var.key_pair_name
+  sg_id         = module.network.app_sg_id
+  subnet_id     = module.network.subnet_id
 }
 
 module "monitoring" {
