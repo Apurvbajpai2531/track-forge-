@@ -1,0 +1,98 @@
+---
+- name: Deploy the monitoring stack
+  hosts: trackforge
+  become: true
+
+  vars:
+    monitoring_dir: /opt/trackforge-monitoring
+
+  tasks:
+    - name: Create a 2G swap file (only if it does not exist)
+      ansible.builtin.command:
+        cmd: fallocate -l 2G /swapfile
+        creates: /swapfile
+      register: swap_created
+
+    - name: Restrict swap file permissions
+      ansible.builtin.file:
+        path: /swapfile
+        mode: "0600"
+
+    - name: Format the swap file
+      ansible.builtin.command: mkswap /swapfile
+      when: swap_created.changed
+
+    - name: Enable the swap file
+      ansible.builtin.command: swapon /swapfile
+      when: swap_created.changed
+
+    - name: Keep swap enabled after reboot
+      ansible.builtin.lineinfile:
+        path: /etc/fstab
+        line: "/swapfile none swap sw 0 0"
+        state: present
+
+    - name: Create the monitoring directory
+      ansible.builtin.file:
+        path: "{{ monitoring_dir }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Copy Prometheus config
+      ansible.builtin.copy:
+        src: monitoring/prometheus.yml
+        dest: "{{ monitoring_dir }}/prometheus.yml"
+        mode: "0644"
+      notify: Restart monitoring stack
+
+    - name: Copy alert rules
+      ansible.builtin.copy:
+        src: monitoring/alerts.yml
+        dest: "{{ monitoring_dir }}/alerts.yml"
+        mode: "0644"
+      notify: Restart monitoring stack
+
+    - name: Copy blackbox config
+      ansible.builtin.copy:
+        src: monitoring/blackbox.yml
+        dest: "{{ monitoring_dir }}/blackbox.yml"
+        mode: "0644"
+      notify: Restart monitoring stack
+
+    - name: Copy Grafana datasource provisioning
+      ansible.builtin.copy:
+        src: monitoring/grafana-datasources.yml
+        dest: "{{ monitoring_dir }}/grafana-datasources.yml"
+        mode: "0644"
+      notify: Restart monitoring stack
+
+    - name: Render the monitoring compose file
+      ansible.builtin.template:
+        src: monitoring-compose.yml.j2
+        dest: "{{ monitoring_dir }}/docker-compose.yml"
+        owner: ubuntu
+        group: ubuntu
+        mode: "0600"
+
+    - name: Pull images and start the monitoring stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_dir }}"
+        pull: always
+        state: present
+
+    - name: Wait until Prometheus is ready
+      ansible.builtin.uri:
+        url: http://localhost:9090/-/ready
+        status_code: 200
+      register: prom_ready
+      retries: 12
+      delay: 5
+      until: prom_ready.status == 200
+
+  handlers:
+    - name: Restart monitoring stack
+      community.docker.docker_compose_v2:
+        project_src: "{{ monitoring_dir }}"
+        state: restarted
