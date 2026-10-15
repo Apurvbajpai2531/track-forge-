@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: trackforge-backend
-          image: apurv25/trackforge-backend:latest
+          image: apurv25/trackforge-backend:obs-1
           ports:
             - containerPort: 8000
           env:

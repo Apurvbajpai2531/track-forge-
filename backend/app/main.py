@@ -51,3 +51,8 @@ def on_startup():
 @app.get("/api/health")
 def health():
     return {"status": "ok", "service": "trackforge-api", "version": "2.0.0"}
+
+
+from app.observability import setup_observability  # noqa: E402
+
+setup_observability(app)

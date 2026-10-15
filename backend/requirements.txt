@@ -13,3 +13,4 @@ slowapi==0.1.9
 pytest==8.3.3
 httpx==0.27.2
 email-validator
+prometheus-fastapi-instrumentator>=7.0.0,<8

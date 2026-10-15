@@ -3,11 +3,14 @@ kind: Service
 metadata:
   name: backend-service
   namespace: trackforge
+  labels:
+    app: trackforge-backend
 spec:
   type: ClusterIP
   selector:
     app: trackforge-backend
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 8000
       targetPort: 8000
